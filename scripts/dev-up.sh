@@ -69,12 +69,6 @@ nodes:
       - containerPort: 443
         hostPort: 443
         protocol: TCP
-      - containerPort: 8080
-        hostPort: 8080
-        protocol: TCP
-      - containerPort: 8090
-        hostPort: 8090
-        protocol: TCP
     extraMounts:
       - hostPath: ${SCRIPT_DIR}/dags
         containerPath: /dags-host

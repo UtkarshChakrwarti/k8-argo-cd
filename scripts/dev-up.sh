@@ -302,6 +302,15 @@ setup_airflow_portforward() {
     log_info "Starting Airflow port-forward on localhost:8090..."
     kubectl port-forward -n "$AIRFLOW_NAMESPACE" svc/dev-airflow-webserver 8090:8080 \
         --address 0.0.0.0 >/dev/null 2>&1 &
+    # Fetch the dynamically generated Airflow password for the admin user
+    log_info "Fetching generated Airflow password..."
+    local gen_pass
+    gen_pass=$(kubectl exec -n "$AIRFLOW_NAMESPACE" deploy/dev-airflow-webserver -c webserver -- python3 -c "import airflow.api_fastapi.auth.managers.simple.simple_auth_manager as m; users = m.SimpleAuthManager.get_users(); print(m.SimpleAuthManager.get_passwords(users)['admin'])" 2>/dev/null || echo "admin")
+    
+    # Update the credentials file with the actual working password
+    sed -i.bak "s/password:.*admin/password:   $gen_pass/" "$SCRIPT_DIR/.airflow-credentials.txt" 2>/dev/null || true
+    rm -f "$SCRIPT_DIR/.airflow-credentials.txt.bak"
+
     log_success "Airflow UI available at http://localhost:8090"
 }
 
@@ -314,6 +323,18 @@ setup_argocd_portforward() {
     kubectl port-forward -n "$ARGOCD_NAMESPACE" svc/argocd-server 8080:443 \
         --address 0.0.0.0 >/dev/null 2>&1 &
     log_success "Argo CD UI available at https://localhost:8080"
+
+    cat > "$SCRIPT_DIR/.argocd-credentials.txt" <<EOF
+# Argo CD Credentials (DO NOT COMMIT)
+
+===============================================
+CONNECTION DETAILS FOR ARGO CD
+===============================================
+UI URL: https://localhost:8080
+Username: admin
+Password: admin
+EOF
+    chmod 600 "$SCRIPT_DIR/.argocd-credentials.txt"
 }
 
 # ─── Port-forward MySQL ───────────────────────────────────────────────────────
@@ -338,8 +359,8 @@ print_summary() {
     log_success " GitOps POC - Local Stack Ready!"
     log_success "══════════════════════════════════════════"
     echo ""
-    echo "  Argo CD UI   →  https://localhost:8080  (make argocd-ui)"
-    echo "  Airflow UI   →  http://localhost:8090   (admin / ${admin_pass:-see .airflow-credentials.txt})"
+    echo "  Argo CD UI   →  https://localhost:8080  (see .argocd-credentials.txt)"
+    echo "  Airflow UI   →  http://localhost:8090   (see .airflow-credentials.txt)"
     echo "  MySQL DB     →  127.0.0.1:3306          (see .mysql-credentials.txt)"
     echo "  Git repo     →  ${REPO_URL}"
     echo ""

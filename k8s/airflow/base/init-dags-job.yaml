@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-dags-job
+  namespace: airflow
+spec:
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      serviceAccountName: airflow
+      restartPolicy: Never
+      containers:
+        - name: init-dags
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Initializing DAGs PVC..."
+              ls -la /tmp/dags-init/
+              if [ -f /tmp/dags-init/load_testing_dag.py ]; then
+                echo "Copying DAGs to PVC..."
+                cp /tmp/dags-init/* /dags/
+                echo "DAGs copied successfully"
+                ls -la /dags/
+              else
+                echo "No DAGs found in init directory"
+              fi
+              echo "Initialization complete"
+          volumeMounts:
+            - name: dags-source
+              mountPath: /tmp/dags-init
+            - name: dags-pvc
+              mountPath: /dags
+      volumes:
+        - name: dags-source
+          configMap:
+            name: airflow-init-dags
+        - name: dags-pvc
+          persistentVolumeClaim:
+            claimName: dags-pvc

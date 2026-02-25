@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dags-pvc
+  namespace: airflow
+  labels:
+    app: airflow
+    part-of: gitops-poc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# NOTE: For production, replace the emptyDir volumes in deployments with:
+# - name: dags
+#   persistentVolumeClaim:
+#     claimName: dags-pvc
+# For local development (kind), we use emptyDir + init containers
+# This avoids storage provisioning issues while maintaining the pattern

@@ -13,6 +13,22 @@ spec:
         app: airflow-scheduler
     spec:
       serviceAccountName: airflow
+      initContainers:
+        - name: init-dags
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Initializing DAGs from ConfigMap..."
+              cp /dags-init/* /dags/ 2>/dev/null || true
+              ls -la /dags/
+              echo "DAGs initialization complete"
+          volumeMounts:
+            - name: dags-init
+              mountPath: /dags-init
+            - name: dags
+              mountPath: /dags
       containers:
         - name: scheduler
           image: apache/airflow:3.0.1-python3.12
@@ -41,6 +57,9 @@ spec:
       volumes:
         - name: airflow-logs
           emptyDir: {}
+        - name: dags-init
+          configMap:
+            name: airflow-init-dags
         - name: dags
           emptyDir: {}
         - name: pod-template

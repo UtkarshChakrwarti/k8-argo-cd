@@ -3,8 +3,12 @@ kind: ConfigMap
 metadata:
   name: mysql-init
 data:
-  init-db.sql: |
-    CREATE DATABASE IF NOT EXISTS airflow;
-    CREATE USER IF NOT EXISTS 'airflow'@'%' IDENTIFIED BY '${AIRFLOW_DB_PASSWORD}';
-    GRANT ALL PRIVILEGES ON airflow.* TO 'airflow'@'%';
-    FLUSH PRIVILEGES;
+  init-db.sh: |
+    #!/bin/bash
+    set -e
+    mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
+        CREATE DATABASE IF NOT EXISTS airflow;
+        CREATE USER IF NOT EXISTS 'airflow'@'%' IDENTIFIED BY '${AIRFLOW_DB_PASSWORD}';
+        GRANT ALL PRIVILEGES ON airflow.* TO 'airflow'@'%';
+        FLUSH PRIVILEGES;
+    EOSQL

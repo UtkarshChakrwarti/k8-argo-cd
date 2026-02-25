@@ -13,6 +13,22 @@
 # Let's use the PVC for the synced content to avoid re-cloning on every restart.
 
 apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: git-sync-pv
+  labels:
+    app: airflow
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /dags-host
+    type: DirectoryOrCreate
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: git-sync-pvc
@@ -23,4 +39,5 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: "" # Use default (standard) or leave empty for Kind
+  volumeName: git-sync-pv
+  storageClassName: ""

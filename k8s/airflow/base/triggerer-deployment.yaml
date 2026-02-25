@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-triggerer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-triggerer
+  template:
+    metadata:
+      labels:
+        app: airflow-triggerer
+    spec:
+      serviceAccountName: airflow
+      containers:
+        - name: triggerer
+          image: apache/airflow:3.0.1-python3.12
+          command: ["airflow", "triggerer"]
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+            - secretRef:
+                name: airflow-secret
+          volumeMounts:
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
+            - name: dags
+              mountPath: /home/airflow/dags
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "airflow jobs check --job-type TriggererJob"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: airflow-logs
+          emptyDir: {}
+        - name: dags
+          emptyDir: {}

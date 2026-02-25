@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-scheduler
+  template:
+    metadata:
+      labels:
+        app: airflow-scheduler
+    spec:
+      serviceAccountName: airflow
+      containers:
+        - name: scheduler
+          image: apache/airflow:3.0.1-python3.12
+          command: ["airflow", "scheduler", "--skip-serve-logs"]
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+            - secretRef:
+                name: airflow-secret
+          volumeMounts:
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
+            - name: dags
+              mountPath: /home/airflow/dags
+            - name: pod-template
+              mountPath: /home/airflow/pod_templates
+              readOnly: true
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "airflow jobs check --job-type SchedulerJob --hostname $(hostname)"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: airflow-logs
+          emptyDir: {}
+        - name: dags
+          emptyDir: {}
+        - name: pod-template
+          configMap:
+            name: airflow-pod-template

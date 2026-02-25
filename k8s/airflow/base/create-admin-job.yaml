@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: airflow-create-admin
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      serviceAccountName: airflow
+      restartPolicy: Never
+      containers:
+        - name: airflow-create-admin
+          image: apache/airflow:3.0.1-python3.12
+          command:
+            - /bin/bash
+            - -c
+            - |
+              airflow users create \
+                --username admin \
+                --firstname Admin \
+                --lastname User \
+                --role Admin \
+                --email admin@example.com \
+                --password $(echo $AIRFLOW_ADMIN_PASSWORD | base64 -d) || echo "Admin user already exists"
+          env:
+            - name: AIRFLOW_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: admin-password
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+            - secretRef:
+                name: airflow-secret
+          volumeMounts:
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
+            - name: dags
+              mountPath: /home/airflow/dags
+      volumes:
+        - name: airflow-logs
+          emptyDir: {}
+        - name: dags
+          emptyDir: {}
+  backoffLimit: 3

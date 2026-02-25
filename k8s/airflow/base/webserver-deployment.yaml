@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-webserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-webserver
+  template:
+    metadata:
+      labels:
+        app: airflow-webserver
+    spec:
+      serviceAccountName: airflow
+      containers:
+        - name: webserver
+          image: apache/airflow:3.0.1-python3.12
+          ports:
+            - containerPort: 8080
+          command: ["airflow", "api-server"]
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+            - secretRef:
+                name: airflow-secret
+          volumeMounts:
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
+            - name: dags
+              mountPath: /home/airflow/dags
+            - name: pod-template
+              mountPath: /home/airflow/pod_templates
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: airflow-logs
+          emptyDir: {}
+        - name: dags
+          emptyDir: {}
+        - name: pod-template
+          configMap:
+            name: airflow-pod-template

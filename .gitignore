@@ -1,0 +1,48 @@
+# Credentials and Secrets
+.airflow-credentials.txt
+.mysql-credentials.txt
+.webui_secret_key
+.argocd-password
+.airflow-password
+.mysql-password
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+.logs/
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.env
+venv/
+env/
+
+# Docker
+.docker/
+
+# Kubernetes
+kubeconfig
+.kube/
+
+# Node
+node_modules/
+npm-debug.log
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

@@ -5,7 +5,6 @@ resources:
   - serviceaccount.yaml
   - configmap.yaml
   - dag-sync-sidecar.yaml
-  - dags-pvc.yaml
   - migrate-job.yaml
   - webserver-deployment.yaml
   - scheduler-deployment.yaml

@@ -146,10 +146,11 @@ create_namespaces() {
 # ─── MySQL secret ─────────────────────────────────────────────────────────────
 create_mysql_secret() {
     log_info "Creating MySQL secrets..."
-    if kubectl get secret mysql-secret -n "$MYSQL_NAMESPACE" &>/dev/null; then
+    # Kustomize overlay adds "dev-" prefix to all resource names, so secrets
+    # created here must match the prefixed names that pods will reference.
+    if kubectl get secret dev-mysql-secret -n "$MYSQL_NAMESPACE" &>/dev/null; then
         log_warning "MySQL secret already exists, skipping"
-        # Re-read password for Airflow secret step
-        AIRFLOW_DB_PASSWORD=$(kubectl get secret mysql-secret -n "$MYSQL_NAMESPACE" \
+        AIRFLOW_DB_PASSWORD=$(kubectl get secret dev-mysql-secret -n "$MYSQL_NAMESPACE" \
             -o jsonpath='{.data.airflow-password}' | base64 -d)
         return 0
     fi
@@ -157,7 +158,7 @@ create_mysql_secret() {
     MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-$(openssl rand -hex 20)}"
     AIRFLOW_DB_PASSWORD="${AIRFLOW_DB_PASSWORD:-$(openssl rand -hex 20)}"
 
-    kubectl create secret generic mysql-secret \
+    kubectl create secret generic dev-mysql-secret \
         --from-literal=root-password="$MYSQL_ROOT_PASSWORD" \
         --from-literal=airflow-password="$AIRFLOW_DB_PASSWORD" \
         -n "$MYSQL_NAMESPACE" || { log_error "Failed to create MySQL secret"; return 1; }
@@ -175,7 +176,7 @@ EOF
 # ─── Airflow secret ───────────────────────────────────────────────────────────
 create_airflow_secret() {
     log_info "Creating Airflow secrets..."
-    if kubectl get secret airflow-secret -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
+    if kubectl get secret dev-airflow-secret -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
         log_warning "Airflow secret already exists, skipping"
         return 0
     fi
@@ -185,9 +186,10 @@ create_airflow_secret() {
     AIRFLOW_ADMIN_PASSWORD="${AIRFLOW_ADMIN_PASSWORD:-$(openssl rand -hex 16)}"
 
     # Airflow 3.0: correct key is AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-    SQL_ALCHEMY_CONN="mysql+pymysql://airflow:${AIRFLOW_DB_PASSWORD}@mysql.mysql.svc.cluster.local:3306/airflow"
+    # MySQL service is "dev-mysql" after kustomize namePrefix
+    SQL_ALCHEMY_CONN="mysql+pymysql://airflow:${AIRFLOW_DB_PASSWORD}@dev-mysql.mysql.svc.cluster.local:3306/airflow"
 
-    kubectl create secret generic airflow-secret \
+    kubectl create secret generic dev-airflow-secret \
         --from-literal=AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="$SQL_ALCHEMY_CONN" \
         --from-literal=AIRFLOW__CORE__FERNET_KEY="$AIRFLOW_FERNET_KEY" \
         --from-literal=AIRFLOW__WEBSERVER__SECRET_KEY="$AIRFLOW_WEBSERVER_SECRET_KEY" \
@@ -260,7 +262,7 @@ wait_for_airflow() {
     log_info "Waiting for Airflow webserver (may take 3-5 min)..."
     for i in $(seq 1 180); do
         if kubectl wait --for=condition=available --timeout=5s \
-            deployment/airflow-webserver -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
+            deployment/dev-airflow-webserver -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
             log_success "Airflow webserver is ready"
             return 0
         fi
@@ -277,7 +279,7 @@ setup_airflow_portforward() {
     pkill -f "kubectl port-forward.*airflow.*8090" 2>/dev/null || true
     sleep 1
     log_info "Starting Airflow port-forward on localhost:8090..."
-    kubectl port-forward -n "$AIRFLOW_NAMESPACE" svc/airflow-webserver 8090:8080 \
+    kubectl port-forward -n "$AIRFLOW_NAMESPACE" svc/dev-airflow-webserver 8090:8080 \
         --address 0.0.0.0 >/dev/null 2>&1 &
     log_success "Airflow UI available at http://localhost:8090"
 }

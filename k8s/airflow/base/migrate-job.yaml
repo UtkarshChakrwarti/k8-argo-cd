@@ -14,8 +14,6 @@ spec:
           image: apache/airflow:3.0.0-python3.12
           command: ["airflow", "db", "migrate"]
           envFrom:
-            - configMapRef:
-                name: airflow-config
             - secretRef:
                 name: airflow-secret
           volumeMounts:

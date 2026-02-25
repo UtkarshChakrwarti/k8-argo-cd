@@ -4,7 +4,7 @@ This DAG simulates heavy workload for testing purposes
 """
 
 from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import time
 import random
@@ -22,7 +22,7 @@ with DAG(
     'load_testing_dag',
     default_args=default_args,
     description='Load testing DAG with heavy compute tasks',
-    schedule_interval='@hourly',
+    schedule='@hourly',
     catchup=False,
     tags=['testing', 'load-test'],
 ) as dag:
@@ -124,4 +124,13 @@ with DAG(
     
     # Set task dependencies for load testing pipeline
     # CPU tasks run in parallel first
-    [cpu_task_1, cpu_task_2] >> [memory_task_1, memory_task_2] >> [io_task_1, io_task_2] >> data_processing
+    for cpu_task in [cpu_task_1, cpu_task_2]:
+        for mem_task in [memory_task_1, memory_task_2]:
+            cpu_task >> mem_task
+
+    for mem_task in [memory_task_1, memory_task_2]:
+        for io_task in [io_task_1, io_task_2]:
+            mem_task >> io_task
+
+    for io_task in [io_task_1, io_task_2]:
+        io_task >> data_processing

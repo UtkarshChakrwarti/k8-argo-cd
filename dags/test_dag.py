@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.bash import BashOperator
+from airflow.providers.standard.operators.bash import BashOperator
 from datetime import datetime, timedelta
 
 with DAG(
@@ -13,7 +13,7 @@ with DAG(
         "retry_delay": timedelta(minutes=5),
     },
     description="A simple test DAG to verify local gitops sync",
-    schedule_interval=timedelta(days=1),
+    schedule=timedelta(days=1),
     start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=["test", "gitops"],

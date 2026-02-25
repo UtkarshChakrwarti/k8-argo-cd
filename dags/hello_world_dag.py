@@ -4,7 +4,7 @@ This DAG demonstrates basic task orchestration
 """
 
 from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
 from datetime import datetime, timedelta
 
 # Default arguments for the DAG
@@ -20,7 +20,7 @@ with DAG(
     'hello_world_dag',
     default_args=default_args,
     description='A simple hello world DAG',
-    schedule_interval='@daily',
+    schedule='@daily',
     catchup=False,
     tags=['example', 'tutorial'],
 ) as dag:

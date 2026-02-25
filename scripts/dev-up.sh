@@ -86,14 +86,6 @@ EOF
     log_success "Kind cluster created"
 }
 
-# ─── Build & load dag-sync image ─────────────────────────────────────────────
-build_dag_sync() {
-    log_info "Building dag-sync sidecar image..."
-    docker build -t dag-sync:local "$SCRIPT_DIR/dag-sync/" || { log_error "Failed to build dag-sync"; return 1; }
-    log_info "Loading dag-sync image into Kind..."
-    kind load docker-image dag-sync:local --name "$CLUSTER_NAME" || { log_error "Failed to load dag-sync"; return 1; }
-    log_success "dag-sync image ready"
-}
 
 # ─── Ingress NGINX ────────────────────────────────────────────────────────────
 install_ingress_nginx() {
@@ -376,7 +368,6 @@ main() {
     check_prerequisites     || exit 1
     verify_repo_access      || exit 1
     create_kind_cluster     || exit 1
-    build_dag_sync          || exit 1
     install_ingress_nginx   || exit 1
     install_argocd          || exit 1
     create_namespaces       || exit 1

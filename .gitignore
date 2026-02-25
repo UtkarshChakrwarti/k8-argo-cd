@@ -45,4 +45,6 @@ npm-debug.log
 # Build artifacts
 dist/
 build/
-*.egg-info/
+# Airflow Sync
+dags/*
+!dags/.gitkeep

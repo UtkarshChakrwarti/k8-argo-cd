@@ -167,6 +167,22 @@ create_mysql_secret() {
 # MySQL Credentials (DO NOT COMMIT)
 MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
 AIRFLOW_DB_PASSWORD=$AIRFLOW_DB_PASSWORD
+
+===============================================
+CONNECTION DETAILS FOR SQL GUI (DataGrip, DBeaver)
+===============================================
+Host: 127.0.0.1
+Port: 3306
+
+-- Root User (admin)
+User: root
+Password: $MYSQL_ROOT_PASSWORD
+Database: (leave blank)
+
+-- Airflow User
+User: airflow
+Password: $AIRFLOW_DB_PASSWORD
+Database: airflow
 EOF
     chmod 600 "$SCRIPT_DIR/.mysql-credentials.txt"
     log_warning "MySQL credentials saved to .mysql-credentials.txt"
@@ -284,6 +300,17 @@ setup_airflow_portforward() {
     log_success "Airflow UI available at http://localhost:8090"
 }
 
+# ─── Port-forward MySQL ───────────────────────────────────────────────────────
+setup_mysql_portforward() {
+    # Kill any stale port-forward for mysql
+    pkill -f "kubectl port-forward.*mysql.*3306" 2>/dev/null || true
+    sleep 1
+    log_info "Starting MySQL port-forward on localhost:3306..."
+    kubectl port-forward -n "$MYSQL_NAMESPACE" svc/dev-mysql 3306:3306 \
+        --address 0.0.0.0 >/dev/null 2>&1 &
+    log_success "MySQL DB accessible at 127.0.0.1:3306"
+}
+
 # ─── Summary ──────────────────────────────────────────────────────────────────
 print_summary() {
     local admin_pass=""
@@ -297,6 +324,7 @@ print_summary() {
     echo ""
     echo "  Argo CD UI   →  https://localhost:8080  (make argocd-ui)"
     echo "  Airflow UI   →  http://localhost:8090   (admin / ${admin_pass:-see .airflow-credentials.txt})"
+    echo "  MySQL DB     →  127.0.0.1:3306          (see .mysql-credentials.txt)"
     echo "  Git repo     →  ${REPO_URL}"
     echo ""
     echo "  make status      – component health"
@@ -321,6 +349,7 @@ main() {
     patch_child_apps        || exit 1
     wait_for_airflow        || true
     setup_airflow_portforward || true
+    setup_mysql_portforward   || true
     print_summary
 }
 

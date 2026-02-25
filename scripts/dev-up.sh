@@ -131,6 +131,11 @@ install_argocd() {
     kubectl wait --for=condition=available --timeout=300s \
         deployment/argocd-server -n "$ARGOCD_NAMESPACE" 2>/dev/null || \
         log_warning "Timeout on Argo CD server, continuing..."
+
+    log_info "Setting Argo CD admin password to 'admin'..."
+    kubectl patch secret argocd-secret -n "$ARGOCD_NAMESPACE" \
+        -p '{"stringData": {"admin.password": "$2b$12$oLr8O3sm54Tg00GUsSMhaOI5ipi2.Wb9wIihPERpczpQFb4oOa3MG", "admin.passwordMtime": "'$(date +%FT%T%Z)'"}}' || true
+
     log_success "Argo CD installed"
 }
 
@@ -199,7 +204,7 @@ create_airflow_secret() {
     AIRFLOW_FERNET_KEY="${AIRFLOW_FERNET_KEY:-$(python3 -c \
         'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')}"
     AIRFLOW_WEBSERVER_SECRET_KEY="${AIRFLOW_WEBSERVER_SECRET_KEY:-$(openssl rand -hex 32)}"
-    AIRFLOW_ADMIN_PASSWORD="${AIRFLOW_ADMIN_PASSWORD:-$(openssl rand -hex 16)}"
+    AIRFLOW_ADMIN_PASSWORD="admin"
 
     # Airflow 3.0: correct key is AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
     # MySQL service is "dev-mysql" after kustomize namePrefix
@@ -300,6 +305,17 @@ setup_airflow_portforward() {
     log_success "Airflow UI available at http://localhost:8090"
 }
 
+# ─── Port-forward Argo CD ─────────────────────────────────────────────────────
+setup_argocd_portforward() {
+    # Kill any stale port-forward for argocd
+    pkill -f "kubectl port-forward.*argocd-server.*8080" 2>/dev/null || true
+    sleep 1
+    log_info "Starting Argo CD port-forward on localhost:8080..."
+    kubectl port-forward -n "$ARGOCD_NAMESPACE" svc/argocd-server 8080:443 \
+        --address 0.0.0.0 >/dev/null 2>&1 &
+    log_success "Argo CD UI available at https://localhost:8080"
+}
+
 # ─── Port-forward MySQL ───────────────────────────────────────────────────────
 setup_mysql_portforward() {
     # Kill any stale port-forward for mysql
@@ -348,6 +364,7 @@ main() {
     bootstrap_argocd        || exit 1
     patch_child_apps        || exit 1
     wait_for_airflow        || true
+    setup_argocd_portforward  || true
     setup_airflow_portforward || true
     setup_mysql_portforward   || true
     print_summary

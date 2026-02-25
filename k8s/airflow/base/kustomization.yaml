@@ -7,7 +7,6 @@ resources:
   - dag-sync-sidecar.yaml
   - dags-pvc.yaml
   - migrate-job.yaml
-  - create-admin-job.yaml
   - webserver-deployment.yaml
   - scheduler-deployment.yaml
   - triggerer-deployment.yaml

@@ -18,7 +18,20 @@ spec:
           image: apache/airflow:3.0.0-python3.12
           ports:
             - containerPort: 8080
-          command: ["airflow", "api-server"]
+          command:
+            - /bin/bash
+            - -c
+            - |
+              echo "{\"admin\":\"${AIRFLOW_ADMIN_PASSWORD}\"}" > /home/airflow/passwords.json
+              exec airflow api-server
+          env:
+            - name: AIRFLOW_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: admin-password
+            - name: AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE
+              value: "/home/airflow/passwords.json"
           envFrom:
             - configMapRef:
                 name: airflow-config

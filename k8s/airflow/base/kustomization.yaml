@@ -10,6 +10,7 @@ resources:
   - scheduler-deployment.yaml
   - dag-processor-deployment.yaml
   - triggerer-deployment.yaml
+  - logs-pvc.yaml
   - webserver-service.yaml
 
 namespace: airflow

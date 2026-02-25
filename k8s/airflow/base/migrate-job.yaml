@@ -21,5 +21,6 @@ spec:
               mountPath: /home/airflow/logs
       volumes:
         - name: airflow-logs
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: dev-logs-local-pvc
   backoffLimit: 3

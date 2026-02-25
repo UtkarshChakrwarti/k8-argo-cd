@@ -9,7 +9,7 @@ data:
   AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE: airflow
   AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE: /home/airflow/pod_templates/pod_template.yaml
   # DAGs
-  AIRFLOW__CORE__DAGS_FOLDER: /home/airflow/dags
+  AIRFLOW__CORE__DAGS_FOLDER: /home/airflow/dags/repo/dags
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   # Execution API (Airflow 3)
   AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://dev-airflow-webserver.airflow.svc.cluster.local:8080/execution/"
@@ -50,7 +50,12 @@ data:
           volumeMounts:
             - name: dags
               mountPath: /home/airflow/dags
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
       volumes:
         - name: dags
           persistentVolumeClaim:
-            claimName: dev-dags-local-pvc
+            claimName: dev-git-sync-pvc
+        - name: airflow-logs
+          persistentVolumeClaim:
+            claimName: dev-logs-local-pvc

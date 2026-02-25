@@ -72,10 +72,14 @@ nodes:
     extraMounts:
       - hostPath: ${SCRIPT_DIR}/dags
         containerPath: /dags-host
+      - hostPath: ${SCRIPT_DIR}/logs
+        containerPath: /logs-host
   - role: worker
     extraMounts:
       - hostPath: ${SCRIPT_DIR}/dags
         containerPath: /dags-host
+      - hostPath: ${SCRIPT_DIR}/logs
+        containerPath: /logs-host
 EOF
     kind create cluster --config "$KIND_CONFIG" || { log_error "Failed to create cluster"; return 1; }
     kubectl cluster-info --context "kind-${CLUSTER_NAME}" >/dev/null 2>&1

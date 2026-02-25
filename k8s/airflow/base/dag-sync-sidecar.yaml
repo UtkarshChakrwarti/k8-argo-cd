@@ -1,42 +1,26 @@
 # dag-sync-sidecar.yaml
-# Provides the hostPath PersistentVolume that maps the Kind-mounted
-# local dags/ folder into the cluster, plus the dag-sync container spec
-# used as a sidecar in both webserver and scheduler deployments.
+# We use the official Kubernetes git-sync sidecar to pull DAGs from
+# a remote repository.
 
-# --- PersistentVolume (hostPath → Kind node mount point) ---
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: dags-local-pv
-  labels:
-    app: airflow
-    part-of: gitops-poc
-spec:
-  capacity:
-    storage: 1Gi
-  accessModes:
-    - ReadWriteMany
-  persistentVolumeReclaimPolicy: Retain
-  hostPath:
-    # This path is created inside the Kind node by extraMounts in the
-    # cluster config, pointing at the local repo's dags/ directory.
-    path: /dags-host
-    type: DirectoryOrCreate
----
-# --- PersistentVolumeClaim ---
+# --- git-sync container spec fragment ---
+# This is used as a sidecar in webserver and scheduler deployments.
+# It syncs https://github.com/UtkarshChakrwarti/remote_airflow.git
+# to a shared volume.
+
+# Note: We no longer need the local dags-local-pv/pvc here as we 
+# will use a shared emptyDir for the synced git repo, or continue 
+# using the PVC if we want persistence across pod restarts.
+# Let's use the PVC for the synced content to avoid re-cloning on every restart.
+
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: dags-local-pvc
+  name: git-sync-pvc
   namespace: airflow
-  labels:
-    app: airflow
-    part-of: gitops-poc
 spec:
   accessModes:
     - ReadWriteMany
   resources:
     requests:
       storage: 1Gi
-  volumeName: dags-local-pv
-  storageClassName: ""
+  storageClassName: "" # Use default (standard) or leave empty for Kind

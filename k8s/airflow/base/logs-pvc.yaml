@@ -1,0 +1,38 @@
+# logs-pvc.yaml
+# Provides a hostPath PersistentVolume that maps the local logs/ folder
+# into the cluster, allowing logs to persist even after worker pods are deleted.
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: logs-local-pv
+  labels:
+    app: airflow
+    part-of: gitops-poc
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    # This path is mapped in the Kind node by extraMounts in the cluster config.
+    path: /logs-host
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-local-pvc
+  namespace: airflow
+  labels:
+    app: airflow
+    part-of: gitops-poc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: logs-local-pv
+  storageClassName: ""

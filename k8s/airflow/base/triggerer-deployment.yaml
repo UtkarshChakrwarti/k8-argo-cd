@@ -38,23 +38,18 @@ spec:
             timeoutSeconds: 30
             failureThreshold: 5
 
-        # --- dag-sync sidecar: simulates git-sync from local dags/ folder ---
+        # --- git-sync sidecar: pulls DAGs from remote repo ---
         - name: dag-sync
-          image: dag-sync:local
-          imagePullPolicy: Never
-          env:
-            - name: SRC_DIR
-              value: /dags-source
-            - name: DEST_DIR
-              value: /dags-dest
-            - name: SYNC_INTERVAL
-              value: "10"
+          image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          args:
+            - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
+            - --branch=main
+            - --period=30s
+            - --link=repo
+            - --root=/git
           volumeMounts:
-            - name: dags-host
-              mountPath: /dags-source
-              readOnly: true
             - name: dags
-              mountPath: /dags-dest
+              mountPath: /git
           resources:
             requests:
               cpu: "50m"
@@ -65,9 +60,8 @@ spec:
 
       volumes:
         - name: airflow-logs
-          emptyDir: {}
-        - name: dags-host
           persistentVolumeClaim:
-            claimName: dags-local-pvc
+            claimName: dev-logs-local-pvc
         - name: dags
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: dev-git-sync-pvc

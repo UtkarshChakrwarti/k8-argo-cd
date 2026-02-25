@@ -58,23 +58,18 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
 
-        # --- dag-sync sidecar: simulates git-sync from local dags/ folder ---
+        # --- git-sync sidecar: pulls DAGs from remote repo ---
         - name: dag-sync
-          image: dag-sync:local
-          imagePullPolicy: Never          # loaded into Kind via 'kind load'
-          env:
-            - name: SRC_DIR
-              value: /dags-source
-            - name: DEST_DIR
-              value: /dags-dest
-            - name: SYNC_INTERVAL
-              value: "10"
+          image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          args:
+            - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
+            - --branch=main
+            - --period=30s
+            - --link=repo
+            - --root=/git
           volumeMounts:
-            - name: dags-host         # local dags/ folder via Kind extraMount
-              mountPath: /dags-source
-              readOnly: true
-            - name: dags              # shared writable volume with Airflow
-              mountPath: /dags-dest
+            - name: dags
+              mountPath: /git
           resources:
             requests:
               cpu: "50m"
@@ -85,12 +80,11 @@ spec:
 
       volumes:
         - name: airflow-logs
-          emptyDir: {}
-        - name: dags-host
           persistentVolumeClaim:
-            claimName: dags-local-pvc
+            claimName: dev-logs-local-pvc
         - name: dags
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: dev-git-sync-pvc
         - name: pod-template
           configMap:
             name: airflow-pod-template

@@ -9,6 +9,7 @@ resources:
   - migrate-job.yaml
   - webserver-deployment.yaml
   - scheduler-deployment.yaml
+  - dag-processor-deployment.yaml
   - triggerer-deployment.yaml
   - webserver-service.yaml
 

@@ -11,6 +11,8 @@ data:
   # DAGs
   AIRFLOW__CORE__DAGS_FOLDER: /home/airflow/dags
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  # Execution API (Airflow 3)
+  AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://dev-airflow-webserver.airflow.svc.cluster.local:8080/execution/"
   # Logging
   AIRFLOW__CORE__BASE_LOG_FOLDER: /home/airflow/logs
   # Database (3.0: AIRFLOW__DATABASE__ replaces deprecated AIRFLOW__CORE__)

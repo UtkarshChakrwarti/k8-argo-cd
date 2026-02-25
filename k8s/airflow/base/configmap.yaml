@@ -44,4 +44,4 @@ data:
             - configMapRef:
                 name: dev-airflow-config
             - secretRef:
-                name: dev-airflow-secret
+                name: airflow-secret

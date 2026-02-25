@@ -15,7 +15,7 @@ spec:
       serviceAccountName: airflow
       containers:
         - name: webserver
-          image: apache/airflow:3.0.1-python3.12
+          image: apache/airflow:3.0.0-python3.12
           ports:
             - containerPort: 8080
           command: ["airflow", "api-server"]

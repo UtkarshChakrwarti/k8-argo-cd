@@ -13,25 +13,9 @@ spec:
         app: airflow-triggerer
     spec:
       serviceAccountName: airflow
-      initContainers:
-        - name: init-dags
-          image: busybox:latest
-          command:
-            - sh
-            - -c
-            - |
-              echo "Initializing DAGs from ConfigMap..."
-              cp /dags-init/* /dags/ 2>/dev/null || true
-              ls -la /dags/
-              echo "DAGs initialization complete"
-          volumeMounts:
-            - name: dags-init
-              mountPath: /dags-init
-            - name: dags
-              mountPath: /dags
       containers:
         - name: triggerer
-          image: apache/airflow:3.0.1-python3.12
+          image: apache/airflow:3.0.0-python3.12
           command: ["airflow", "triggerer"]
           envFrom:
             - configMapRef:
@@ -49,13 +33,40 @@ spec:
                 - /bin/bash
                 - -c
                 - "airflow jobs check --job-type TriggererJob"
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 30
+            failureThreshold: 5
+
+        # --- dag-sync sidecar: simulates git-sync from local dags/ folder ---
+        - name: dag-sync
+          image: dag-sync:local
+          imagePullPolicy: Never
+          env:
+            - name: SRC_DIR
+              value: /dags-source
+            - name: DEST_DIR
+              value: /dags-dest
+            - name: SYNC_INTERVAL
+              value: "10"
+          volumeMounts:
+            - name: dags-host
+              mountPath: /dags-source
+              readOnly: true
+            - name: dags
+              mountPath: /dags-dest
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
       volumes:
         - name: airflow-logs
           emptyDir: {}
-        - name: dags-init
-          configMap:
-            name: airflow-init-dags
+        - name: dags-host
+          persistentVolumeClaim:
+            claimName: dags-local-pvc
         - name: dags
           emptyDir: {}

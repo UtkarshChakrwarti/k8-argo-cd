@@ -4,21 +4,24 @@ metadata:
   name: airflow-config
 data:
   AIRFLOW_HOME: /home/airflow
+  # Executor
   AIRFLOW__CORE__EXECUTOR: KubernetesExecutor
   AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE: airflow
   AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE: /home/airflow/pod_templates/pod_template.yaml
-  AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS: "False"
-  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-  AIRFLOW__CORE__UNIT_TEST_MODE: "False"
+  # DAGs
   AIRFLOW__CORE__DAGS_FOLDER: /home/airflow/dags
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  # Logging
   AIRFLOW__CORE__BASE_LOG_FOLDER: /home/airflow/logs
   AIRFLOW__LOGGING__COLORED_LOG_FORMAT: "[%%(blue)s%%(asctime)s%%(reset)s] {%%(filename)s:%%(lineno)d} %%(levelname)s - %%(message)s"
+  # Database (3.0: AIRFLOW__DATABASE__ replaces deprecated AIRFLOW__CORE__)
   AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS: "False"
+  # Webserver / API server
   AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
-  AIRFLOW__WEBSERVER__AUTH_BACKEND: airflow.contrib.auth.backends.password_auth
-  AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "30"
-  # DAG processor config for Airflow 3.0
-  AIRFLOW__CORE__DAG_PROCESSOR_MANAGER_LOG_LOCATION: /home/airflow/logs/dag_processor_manager/dag_processor_manager.log
+  AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+  # Scheduler - keep dag processing inline (no separate dag-processor pod)
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: "False"
+  AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "30"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -36,7 +39,7 @@ data:
       restartPolicy: Never
       containers:
         - name: airflow-task
-          image: apache/airflow:3.0.1-python3.12
+          image: apache/airflow:3.0.0-python3.12
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:

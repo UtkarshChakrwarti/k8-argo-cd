@@ -9,6 +9,7 @@ resources:
 
 namespace: mysql
 
-commonLabels:
-  app: mysql
-  part-of: gitops-poc
+labels:
+  - pairs:
+      app: mysql
+      part-of: gitops-poc

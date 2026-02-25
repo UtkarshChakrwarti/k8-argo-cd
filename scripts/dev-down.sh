@@ -2,57 +2,55 @@
 
 set -euo pipefail
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Configuration
 CLUSTER_NAME="gitops-poc"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GIT_DAEMON_PORT=9418
 
-# Helper functions
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Main function
 main() {
     log_info "Tearing down GitOps POC environment..."
-    
-    log_info "Deleting kind cluster: $CLUSTER_NAME"
-    if kind get clusters | grep -q "^$CLUSTER_NAME$"; then
-        kind delete cluster --name "$CLUSTER_NAME" || {
-            log_error "Failed to delete kind cluster"
-            return 1
-        }
+
+    # Kill kubectl port-forwards
+    log_info "Stopping port-forwards..."
+    pkill -f "kubectl port-forward" 2>/dev/null && log_success "Port-forwards stopped" || \
+        log_warning "No kubectl port-forwards running"
+
+    # Stop git daemon
+    log_info "Stopping git daemon..."
+    local pid
+    pid=$(pgrep -f "git daemon.*${GIT_DAEMON_PORT}" 2>/dev/null || true)
+    if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null && log_success "Git daemon (PID ${pid}) stopped" || \
+            log_warning "Could not stop git daemon"
+    else
+        log_warning "Git daemon not running"
+    fi
+
+    # Delete kind cluster
+    log_info "Deleting kind cluster: ${CLUSTER_NAME}"
+    if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
+        kind delete cluster --name "$CLUSTER_NAME" || { log_error "Failed to delete cluster"; return 1; }
         log_success "Kind cluster deleted"
     else
-        log_warning "Kind cluster '$CLUSTER_NAME' not found"
+        log_warning "Kind cluster '${CLUSTER_NAME}' not found"
     fi
-    
-    log_info "Cleaning up temporary files..."
-    rm -f "$SCRIPT_DIR/.mysql-credentials.txt"
-    rm -f "$SCRIPT_DIR/.airflow-credentials.txt"
-    rm -f /tmp/kind-config.yaml
-    
-    log_success "Cleanup completed successfully"
-    exit 0
+
+    # Clean up temp/credential files
+    log_info "Cleaning up temp files..."
+    rm -f "$SCRIPT_DIR/.mysql-credentials.txt" \
+          "$SCRIPT_DIR/.airflow-credentials.txt" \
+          /tmp/kind-config.yaml
+    log_success "Cleanup complete"
 }
 
-# Run main function
 main "$@"

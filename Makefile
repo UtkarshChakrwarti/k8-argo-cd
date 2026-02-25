@@ -72,20 +72,23 @@ logs:
 	@kubectl logs -n argocd deployment/argocd-server --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== MySQL Logs ===$(NC)"
-	@kubectl logs -n mysql -l app=mysql --tail=50 || true
+	@kubectl logs -n mysql statefulset/dev-mysql --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== Airflow Webserver Logs ===$(NC)"
-	@kubectl logs -n airflow deployment/airflow-webserver --tail=50 || true
+	@kubectl logs -n airflow deployment/dev-airflow-webserver -c webserver --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== Airflow Scheduler Logs ===$(NC)"
-	@kubectl logs -n airflow deployment/airflow-scheduler --tail=50 || true
+	@kubectl logs -n airflow deployment/dev-airflow-scheduler -c scheduler --tail=50 || true
+	@echo ""
+	@echo "$(BLUE)=== Airflow Triggerer Logs ===$(NC)"
+	@kubectl logs -n airflow deployment/dev-airflow-triggerer -c triggerer --tail=50 || true
 
 # Validate manifests
 validate:
 	@echo "$(GREEN)Validating k8s manifests...$(NC)"
-	@kustomize build k8s/mysql/overlays/dev > /dev/null && echo "$(GREEN)✓ MySQL manifests valid$(NC)" || (echo "$(YELLOW)✗ MySQL manifests invalid$(NC)" && false)
-	@kustomize build k8s/airflow/overlays/dev > /dev/null && echo "$(GREEN)✓ Airflow manifests valid$(NC)" || (echo "$(YELLOW)✗ Airflow manifests invalid$(NC)" && false)
-	@kustomize build k8s/apps > /dev/null && echo "$(GREEN)✓ Apps manifests valid$(NC)" || (echo "$(YELLOW)✗ Apps manifests invalid$(NC)" && false)
+	@kubectl kustomize k8s/mysql/overlays/dev > /dev/null && echo "$(GREEN)✓ MySQL manifests valid$(NC)" || (echo "$(YELLOW)✗ MySQL manifests invalid$(NC)" && false)
+	@kubectl kustomize k8s/airflow/overlays/dev > /dev/null && echo "$(GREEN)✓ Airflow manifests valid$(NC)" || (echo "$(YELLOW)✗ Airflow manifests invalid$(NC)" && false)
+	@kubectl kustomize k8s/apps > /dev/null && echo "$(GREEN)✓ Apps manifests valid$(NC)" || (echo "$(YELLOW)✗ Apps manifests invalid$(NC)" && false)
 
 # Clean up credentials
 clean:

@@ -15,6 +15,7 @@ resources:
 
 namespace: airflow
 
-commonLabels:
-  app: airflow
-  part-of: gitops-poc
+labels:
+  - pairs:
+      app: airflow
+      part-of: gitops-poc

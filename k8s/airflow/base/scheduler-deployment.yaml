@@ -65,8 +65,7 @@ spec:
           persistentVolumeClaim:
             claimName: dev-logs-local-pvc
         - name: dags
-          persistentVolumeClaim:
-            claimName: dev-git-sync-pvc
+          emptyDir: {}
         - name: pod-template
           configMap:
             name: airflow-pod-template

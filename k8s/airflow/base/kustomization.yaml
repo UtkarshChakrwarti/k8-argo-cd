@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - serviceaccount.yaml
   - configmap.yaml
-  - dag-sync-sidecar.yaml
   - migrate-job.yaml
   - webserver-deployment.yaml
   - scheduler-deployment.yaml

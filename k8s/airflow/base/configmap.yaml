@@ -13,7 +13,6 @@ data:
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   # Logging
   AIRFLOW__CORE__BASE_LOG_FOLDER: /home/airflow/logs
-  AIRFLOW__LOGGING__COLORED_LOG_FORMAT: "[%%(blue)s%%(asctime)s%%(reset)s] {%%(filename)s:%%(lineno)d} %%(levelname)s - %%(message)s"
   # Database (3.0: AIRFLOW__DATABASE__ replaces deprecated AIRFLOW__CORE__)
   AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS: "False"
   # Webserver / API server

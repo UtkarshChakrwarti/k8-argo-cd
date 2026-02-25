@@ -1,0 +1,42 @@
+# dag-sync-sidecar.yaml
+# Provides the hostPath PersistentVolume that maps the Kind-mounted
+# local dags/ folder into the cluster, plus the dag-sync container spec
+# used as a sidecar in both webserver and scheduler deployments.
+
+# --- PersistentVolume (hostPath → Kind node mount point) ---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: dags-local-pv
+  labels:
+    app: airflow
+    part-of: gitops-poc
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    # This path is created inside the Kind node by extraMounts in the
+    # cluster config, pointing at the local repo's dags/ directory.
+    path: /dags-host
+    type: DirectoryOrCreate
+---
+# --- PersistentVolumeClaim ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dags-local-pvc
+  namespace: airflow
+  labels:
+    app: airflow
+    part-of: gitops-poc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: dags-local-pv
+  storageClassName: ""

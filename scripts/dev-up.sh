@@ -94,7 +94,9 @@ create_kind_cluster() {
         return 0
     fi
     
-    # Create kind config with ingress-ready support and port mappings
+    # Create kind config with ingress-ready support, port mappings, and
+    # extraMounts so the local dags/ folder is available inside the cluster
+    # at /dags-host on every node (used by the dag-sync sidecar).
     cat > "$KIND_CONFIG" <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -116,7 +118,13 @@ nodes:
       - containerPort: 8090
         hostPort: 8090
         protocol: TCP
+    extraMounts:
+      - hostPath: ${SCRIPT_DIR}/dags
+        containerPath: /dags-host
   - role: worker
+    extraMounts:
+      - hostPath: ${SCRIPT_DIR}/dags
+        containerPath: /dags-host
 EOF
     
     kind create cluster --config "$KIND_CONFIG" || {
@@ -293,8 +301,10 @@ bootstrap_argocd() {
         }
     else
         # Create temporary file with root app and substitute REPO_URL
+        # Use portable sed syntax (BSD/macOS requires '' after -i)
         local temp_app=$(mktemp)
         cat "$SCRIPT_DIR/k8s/apps/app-of-apps.yaml" > "$temp_app"
+        sed -i '' "s|\${REPO_URL}|$REPO_URL|g" "$temp_app" 2>/dev/null || \
         sed -i "s|\${REPO_URL}|$REPO_URL|g" "$temp_app"
         
         kubectl create -n "$ARGOCD_NAMESPACE" -f "$temp_app" || {
@@ -314,8 +324,10 @@ patch_child_apps() {
     
     for app in mysql-app airflow-app; do
         # Create temporary file with app and substitute REPO_URL
+        # Use portable sed syntax (BSD/macOS requires '' after -i)
         local temp_app=$(mktemp)
         cat "$SCRIPT_DIR/k8s/apps/${app}.yaml" > "$temp_app"
+        sed -i '' "s|\${REPO_URL}|$REPO_URL|g" "$temp_app" 2>/dev/null || \
         sed -i "s|\${REPO_URL}|$REPO_URL|g" "$temp_app"
         
         # Check if app already exists
@@ -384,6 +396,23 @@ print_summary() {
     log_info "Repository URL: $REPO_URL"
 }
 
+# Build and load dag-sync image into Kind
+build_dag_sync() {
+    log_info "Building dag-sync image..."
+    docker build -t dag-sync:local "$SCRIPT_DIR/dag-sync/" || {
+        log_error "Failed to build dag-sync image"
+        return 1
+    }
+    log_success "dag-sync image built"
+
+    log_info "Loading dag-sync image into Kind cluster..."
+    kind load docker-image dag-sync:local --name "$CLUSTER_NAME" || {
+        log_error "Failed to load dag-sync image into Kind"
+        return 1
+    }
+    log_success "dag-sync image loaded into Kind"
+}
+
 # Main function
 main() {
     log_info "Starting GitOps POC setup..."
@@ -392,6 +421,7 @@ main() {
     check_prerequisites || exit 1
     resolve_repo_url || exit 1
     create_kind_cluster || exit 1
+    build_dag_sync || exit 1
     install_ingress_nginx || exit 1
     install_argocd || exit 1
     create_namespaces || exit 1

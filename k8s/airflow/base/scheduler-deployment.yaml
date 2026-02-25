@@ -13,22 +13,6 @@ spec:
         app: airflow-scheduler
     spec:
       serviceAccountName: airflow
-      initContainers:
-        - name: init-dags
-          image: busybox:latest
-          command:
-            - sh
-            - -c
-            - |
-              echo "Initializing DAGs from ConfigMap..."
-              cp /dags-init/* /dags/ 2>/dev/null || true
-              ls -la /dags/
-              echo "DAGs initialization complete"
-          volumeMounts:
-            - name: dags-init
-              mountPath: /dags-init
-            - name: dags
-              mountPath: /dags
       containers:
         - name: scheduler
           image: apache/airflow:3.0.1-python3.12
@@ -54,12 +38,38 @@ spec:
                 - "airflow jobs check --job-type SchedulerJob --hostname $(hostname)"
             initialDelaySeconds: 30
             periodSeconds: 30
+
+        # --- dag-sync sidecar: simulates git-sync from local dags/ folder ---
+        - name: dag-sync
+          image: dag-sync:local
+          imagePullPolicy: Never          # loaded into Kind via 'kind load'
+          env:
+            - name: SRC_DIR
+              value: /dags-source
+            - name: DEST_DIR
+              value: /dags-dest
+            - name: SYNC_INTERVAL
+              value: "10"
+          volumeMounts:
+            - name: dags-host         # local dags/ folder via Kind extraMount
+              mountPath: /dags-source
+              readOnly: true
+            - name: dags              # shared writable volume with Airflow
+              mountPath: /dags-dest
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
       volumes:
         - name: airflow-logs
           emptyDir: {}
-        - name: dags-init
-          configMap:
-            name: airflow-init-dags
+        - name: dags-host
+          persistentVolumeClaim:
+            claimName: dags-local-pvc
         - name: dags
           emptyDir: {}
         - name: pod-template

@@ -1,4 +1,4 @@
-.PHONY: help dev-up dev-down status argocd-ui airflow-ui logs clean install-prereqs
+.PHONY: help dev-up dev-down status argocd-ui airflow-ui logs clean install-prereqs build-dag-sync
 
 # Colors
 BLUE := \033[0;34m
@@ -29,6 +29,7 @@ help:
 	@echo "  make argocd-port-forward - Manually port-forward Argo CD (8080)"
 	@echo "  make airflow-port-forward - Manually port-forward Airflow (8090)"
 	@echo "  make validate            - Validate k8s manifests with kustomize"
+	@echo "  make build-dag-sync      - Build & load dag-sync image into Kind"
 	@echo "  make clean               - Remove credential files"
 
 # Start development environment
@@ -101,7 +102,15 @@ install-prereqs:
 	@command -v kubectl >/dev/null 2>&1 || (echo "kubectl must be installed manually or via your system package manager")
 	@echo "$(GREEN)Prerequisites installed$(NC)"
 
-# Development environment setup (alias for dev-up)
+# Build and load dag-sync image into Kind cluster
+build-dag-sync:
+	@echo "$(GREEN)Building dag-sync image...$(NC)"
+	@docker build -t dag-sync:local ./dag-sync/
+	@echo "$(GREEN)Loading dag-sync into Kind cluster '$(CLUSTER_NAME)'...$(NC)"
+	@kind load docker-image dag-sync:local --name $(CLUSTER_NAME)
+	@echo "$(GREEN)dag-sync image ready in Kind$(NC)"
+
+
 setup: dev-up
 
 # Cleanup (alias for clean)

@@ -4,9 +4,8 @@ kind: Kustomization
 resources:
   - serviceaccount.yaml
   - configmap.yaml
-  - init-dags.yaml
+  - dag-sync-sidecar.yaml
   - dags-pvc.yaml
-  - init-dags-job.yaml
   - migrate-job.yaml
   - create-admin-job.yaml
   - webserver-deployment.yaml

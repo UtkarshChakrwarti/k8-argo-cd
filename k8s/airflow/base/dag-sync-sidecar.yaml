@@ -7,28 +7,9 @@
 # It syncs https://github.com/UtkarshChakrwarti/remote_airflow.git
 # to a shared volume.
 
-# Note: We no longer need the local dags-local-pv/pvc here as we 
-# will use a shared emptyDir for the synced git repo, or continue 
-# using the PVC if we want persistence across pod restarts.
-# Let's use the PVC for the synced content to avoid re-cloning on every restart.
+# Transitioned to production-grade dynamic provisioning.
+# We no longer use hostPath for dags.
 
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: git-sync-pv
-  labels:
-    app: airflow
-    part-of: gitops-poc
-spec:
-  capacity:
-    storage: 1Gi
-  accessModes:
-    - ReadWriteMany
-  persistentVolumeReclaimPolicy: Retain
-  hostPath:
-    path: /dags-host
-    type: DirectoryOrCreate
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -43,4 +24,4 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: ""
+  storageClassName: "standard" # Use dynamic provisioning

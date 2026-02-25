@@ -8,13 +8,13 @@
 
 # IDE and Editor
 .vscode/
+.claude/
 .idea/
 *.swp
 *.swo
 *~
 
 # Logs
-.logs/
 logs/
 *.log
 
@@ -46,5 +46,4 @@ npm-debug.log
 dist/
 build/
 # Airflow Sync
-dags/*
-!dags/.gitkeep
+dags/

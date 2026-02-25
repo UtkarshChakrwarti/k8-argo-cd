@@ -10,7 +10,6 @@ NC='\033[0m'
 
 CLUSTER_NAME="gitops-poc"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GIT_DAEMON_PORT=9418
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -24,17 +23,6 @@ main() {
     log_info "Stopping port-forwards..."
     pkill -f "kubectl port-forward" 2>/dev/null && log_success "Port-forwards stopped" || \
         log_warning "No kubectl port-forwards running"
-
-    # Stop git daemon
-    log_info "Stopping git daemon..."
-    local pid
-    pid=$(pgrep -f "git daemon.*${GIT_DAEMON_PORT}" 2>/dev/null || true)
-    if [ -n "$pid" ]; then
-        kill "$pid" 2>/dev/null && log_success "Git daemon (PID ${pid}) stopped" || \
-            log_warning "Could not stop git daemon"
-    else
-        log_warning "Git daemon not running"
-    fi
 
     # Delete kind cluster
     log_info "Deleting kind cluster: ${CLUSTER_NAME}"

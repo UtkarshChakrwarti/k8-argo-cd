@@ -15,8 +15,7 @@ MYSQL_NAMESPACE="mysql"
 AIRFLOW_NAMESPACE="airflow"
 KIND_CONFIG="/tmp/kind-config.yaml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_NAME="$(basename "$SCRIPT_DIR")"
-GIT_DAEMON_PORT=9418
+REPO_URL="https://github.com/UtkarshChakrwarti/k8-argo-cd.git"
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -38,53 +37,14 @@ check_prerequisites() {
     log_success "All prerequisites met"
 }
 
-# ─── Git daemon (local GitOps source) ────────────────────────────────────────
-start_git_daemon() {
-    if pgrep -f "git daemon.*${GIT_DAEMON_PORT}" >/dev/null 2>&1; then
-        log_warning "Git daemon already running on port ${GIT_DAEMON_PORT}"
-        return 0
-    fi
-    local base_path
-    base_path="$(dirname "$SCRIPT_DIR")"
-    log_info "Starting local git daemon (base-path=${base_path}, port=${GIT_DAEMON_PORT})..."
-    git daemon \
-        --reuseaddr \
-        --base-path="$base_path" \
-        --export-all \
-        --port="$GIT_DAEMON_PORT" \
-        --detach \
-        --log-destination=none 2>/dev/null || {
-        log_error "Failed to start git daemon"
+# ─── Verify GitHub repo is reachable ──────────────────────────────────────────
+verify_repo_access() {
+    log_info "Verifying access to ${REPO_URL}..."
+    git ls-remote "$REPO_URL" HEAD &>/dev/null || {
+        log_error "Cannot reach ${REPO_URL} – check network or repo permissions"
         return 1
     }
-    sleep 1
-    log_success "Git daemon started"
-}
-
-# ─── Detect Docker host IP visible from inside Kind nodes ────────────────────
-detect_docker_host_ip() {
-    # Runs a throwaway container to resolve host.docker.internal (Docker Desktop)
-    local ip
-    ip=$(docker run --rm alpine sh -c \
-        "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1}'" 2>/dev/null | tr -d '[:space:]')
-    if [ -z "$ip" ]; then
-        # Fallback: gateway of docker bridge network
-        ip=$(docker network inspect bridge \
-            -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null | tr -d '[:space:]')
-    fi
-    if [ -z "$ip" ]; then
-        ip="192.168.65.254"   # Docker Desktop macOS default
-    fi
-    echo "$ip"
-}
-
-# Set REPO_URL to the local git daemon
-resolve_repo_url() {
-    log_info "Resolving local git daemon URL..."
-    local host_ip
-    host_ip=$(detect_docker_host_ip)
-    REPO_URL="git://${host_ip}:${GIT_DAEMON_PORT}/${REPO_NAME}"
-    log_success "REPO_URL = ${REPO_URL}"
+    log_success "Repo accessible: ${REPO_URL}"
 }
 
 # ─── Kind cluster ─────────────────────────────────────────────────────────────
@@ -335,7 +295,7 @@ print_summary() {
     echo ""
     echo "  Argo CD UI   →  https://localhost:8080  (make argocd-ui)"
     echo "  Airflow UI   →  http://localhost:8090   (admin / ${admin_pass:-see .airflow-credentials.txt})"
-    echo "  Git daemon   →  ${REPO_URL}"
+    echo "  Git repo     →  ${REPO_URL}"
     echo ""
     echo "  make status      – component health"
     echo "  make logs        – tail logs"
@@ -347,8 +307,7 @@ print_summary() {
 main() {
     log_info "Starting local GitOps POC..."
     check_prerequisites     || exit 1
-    start_git_daemon        || exit 1
-    resolve_repo_url        || exit 1
+    verify_repo_access      || exit 1
     create_kind_cluster     || exit 1
     build_dag_sync          || exit 1
     install_ingress_nginx   || exit 1

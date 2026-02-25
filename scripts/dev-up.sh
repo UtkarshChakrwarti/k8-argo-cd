@@ -148,9 +148,9 @@ create_mysql_secret() {
     log_info "Creating MySQL secrets..."
     # Kustomize overlay adds "dev-" prefix to all resource names, so secrets
     # created here must match the prefixed names that pods will reference.
-    if kubectl get secret dev-mysql-secret -n "$MYSQL_NAMESPACE" &>/dev/null; then
+    if kubectl get secret mysql-secret -n "$MYSQL_NAMESPACE" &>/dev/null; then
         log_warning "MySQL secret already exists, skipping"
-        AIRFLOW_DB_PASSWORD=$(kubectl get secret dev-mysql-secret -n "$MYSQL_NAMESPACE" \
+        AIRFLOW_DB_PASSWORD=$(kubectl get secret mysql-secret -n "$MYSQL_NAMESPACE" \
             -o jsonpath='{.data.airflow-password}' | base64 -d)
         return 0
     fi
@@ -158,7 +158,7 @@ create_mysql_secret() {
     MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-$(openssl rand -hex 20)}"
     AIRFLOW_DB_PASSWORD="${AIRFLOW_DB_PASSWORD:-$(openssl rand -hex 20)}"
 
-    kubectl create secret generic dev-mysql-secret \
+    kubectl create secret generic mysql-secret \
         --from-literal=root-password="$MYSQL_ROOT_PASSWORD" \
         --from-literal=airflow-password="$AIRFLOW_DB_PASSWORD" \
         -n "$MYSQL_NAMESPACE" || { log_error "Failed to create MySQL secret"; return 1; }
@@ -176,7 +176,7 @@ EOF
 # ─── Airflow secret ───────────────────────────────────────────────────────────
 create_airflow_secret() {
     log_info "Creating Airflow secrets..."
-    if kubectl get secret dev-airflow-secret -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
+    if kubectl get secret airflow-secret -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
         log_warning "Airflow secret already exists, skipping"
         return 0
     fi
@@ -189,7 +189,7 @@ create_airflow_secret() {
     # MySQL service is "dev-mysql" after kustomize namePrefix
     SQL_ALCHEMY_CONN="mysql+pymysql://airflow:${AIRFLOW_DB_PASSWORD}@dev-mysql.mysql.svc.cluster.local:3306/airflow"
 
-    kubectl create secret generic dev-airflow-secret \
+    kubectl create secret generic airflow-secret \
         --from-literal=AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="$SQL_ALCHEMY_CONN" \
         --from-literal=AIRFLOW__CORE__FERNET_KEY="$AIRFLOW_FERNET_KEY" \
         --from-literal=AIRFLOW__WEBSERVER__SECRET_KEY="$AIRFLOW_WEBSERVER_SECRET_KEY" \

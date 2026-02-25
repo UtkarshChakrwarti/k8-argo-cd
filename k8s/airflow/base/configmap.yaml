@@ -34,7 +34,7 @@ data:
       name: airflow-task-pod
       namespace: airflow
     spec:
-      serviceAccountName: airflow
+      serviceAccountName: dev-airflow
       restartPolicy: Never
       containers:
         - name: airflow-task
@@ -42,6 +42,6 @@ data:
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
-                name: airflow-config
+                name: dev-airflow-config
             - secretRef:
-                name: airflow-secret
+                name: dev-airflow-secret

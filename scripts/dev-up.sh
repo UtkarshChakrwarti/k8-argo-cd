@@ -204,6 +204,7 @@ create_airflow_secret() {
     AIRFLOW_FERNET_KEY="${AIRFLOW_FERNET_KEY:-$(python3 -c \
         'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')}"
     AIRFLOW_WEBSERVER_SECRET_KEY="${AIRFLOW_WEBSERVER_SECRET_KEY:-$(openssl rand -hex 32)}"
+    AIRFLOW_API_JWT_SECRET="${AIRFLOW_API_JWT_SECRET:-$(openssl rand -base64 32)}"
     AIRFLOW_ADMIN_PASSWORD="admin"
 
     # Airflow 3.0: correct key is AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
@@ -214,6 +215,7 @@ create_airflow_secret() {
         --from-literal=AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="$SQL_ALCHEMY_CONN" \
         --from-literal=AIRFLOW__CORE__FERNET_KEY="$AIRFLOW_FERNET_KEY" \
         --from-literal=AIRFLOW__WEBSERVER__SECRET_KEY="$AIRFLOW_WEBSERVER_SECRET_KEY" \
+        --from-literal=AIRFLOW__API_AUTH__JWT_SECRET="$AIRFLOW_API_JWT_SECRET" \
         --from-literal=admin-password="$AIRFLOW_ADMIN_PASSWORD" \
         -n "$AIRFLOW_NAMESPACE" || { log_error "Failed to create Airflow secret"; return 1; }
 

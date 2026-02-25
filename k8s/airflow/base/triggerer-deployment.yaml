@@ -35,6 +35,7 @@ spec:
                 - "airflow jobs check --job-type TriggererJob"
             initialDelaySeconds: 60
             periodSeconds: 30
+            timeoutSeconds: 30
             failureThreshold: 5
 
         # --- dag-sync sidecar: simulates git-sync from local dags/ folder ---

@@ -38,6 +38,7 @@ spec:
                 - "airflow jobs check --job-type SchedulerJob --hostname $(hostname)"
             initialDelaySeconds: 30
             periodSeconds: 30
+            timeoutSeconds: 30
 
         # --- dag-sync sidecar: simulates git-sync from local dags/ folder ---
         - name: dag-sync

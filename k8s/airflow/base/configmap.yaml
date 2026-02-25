@@ -47,3 +47,10 @@ data:
                 name: dev-airflow-config
             - secretRef:
                 name: airflow-secret
+          volumeMounts:
+            - name: dags
+              mountPath: /home/airflow/dags
+      volumes:
+        - name: dags
+          persistentVolumeClaim:
+            claimName: dags-local-pvc

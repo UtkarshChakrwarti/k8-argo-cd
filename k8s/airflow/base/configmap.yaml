@@ -20,8 +20,8 @@ data:
   # Webserver / API server
   AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
   AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
-  # Scheduler - keep dag processing inline (no separate dag-processor pod)
-  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: "False"
+  # Scheduler - delegate DAG parsing to the standalone dag-processor pod
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: "True"
   AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "30"
 ---
 apiVersion: v1

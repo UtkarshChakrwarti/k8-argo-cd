@@ -10,6 +10,7 @@ resources:
   - webserver-deployment.yaml
   - scheduler-deployment.yaml
   - triggerer-deployment.yaml
+  - dag-processor-deployment.yaml
   - logs-pvc.yaml
   - webserver-service.yaml
 

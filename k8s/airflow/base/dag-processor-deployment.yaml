@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-dag-processor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-dag-processor
+  template:
+    metadata:
+      labels:
+        app: airflow-dag-processor
+    spec:
+      serviceAccountName: airflow
+      containers:
+        - name: dag-processor
+          image: apache/airflow:3.0.0-python3.12
+          command: ["airflow", "dag-processor"]
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+            - secretRef:
+                name: airflow-secret
+          volumeMounts:
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
+            - name: dags
+              mountPath: /home/airflow/dags
+
+      volumes:
+        - name: airflow-logs
+          persistentVolumeClaim:
+            claimName: dev-logs-local-pvc
+        - name: dags
+          persistentVolumeClaim:
+            claimName: dev-dags-pvc

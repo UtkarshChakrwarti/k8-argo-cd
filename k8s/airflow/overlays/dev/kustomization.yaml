@@ -21,3 +21,5 @@ replicas:
     count: 1
   - name: airflow-dag-sync
     count: 1
+  - name: airflow-dag-processor
+    count: 1

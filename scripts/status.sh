@@ -34,11 +34,29 @@ check_status() {
     local resource_name=$4
 
     if kubectl get "$resource_type" -n "$namespace" "$resource_name" &> /dev/null; then
-        local ready=$(kubectl get "$resource_type" -n "$namespace" "$resource_name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+        if [ "$resource_type" = "deployment" ] || [ "$resource_type" = "statefulset" ]; then
+            local desired
+            local ready
+            desired=$(kubectl get "$resource_type" -n "$namespace" "$resource_name" -o jsonpath='{.status.replicas}' 2>/dev/null || echo "0")
+            ready=$(kubectl get "$resource_type" -n "$namespace" "$resource_name" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+            desired=${desired:-0}
+            ready=${ready:-0}
 
-        if [ "$ready" == "True" ]; then
+            if [ "$desired" -gt 0 ] && [ "$ready" = "$desired" ]; then
+                echo -e "${GREEN}✓${NC} $label: Ready (${ready}/${desired})"
+            elif [ "$ready" -gt 0 ]; then
+                echo -e "${YELLOW}?${NC} $label: Partially Ready (${ready}/${desired})"
+            else
+                echo -e "${RED}✗${NC} $label: Not Ready (${ready}/${desired})"
+            fi
+            return
+        fi
+
+        local ready_cond
+        ready_cond=$(kubectl get "$resource_type" -n "$namespace" "$resource_name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+        if [ "$ready_cond" = "True" ]; then
             echo -e "${GREEN}✓${NC} $label: Ready"
-        elif [ "$ready" == "False" ]; then
+        elif [ "$ready_cond" = "False" ]; then
             echo -e "${RED}✗${NC} $label: Not Ready"
         else
             echo -e "${YELLOW}?${NC} $label: Unknown"
@@ -62,7 +80,7 @@ main() {
     # Argo CD status
     log_section "Argo CD (namespace: $ARGOCD_NAMESPACE)"
     check_status "Server" "$ARGOCD_NAMESPACE" "deployment" "argocd-server"
-    check_status "Controller" "$ARGOCD_NAMESPACE" "deployment" "argocd-application-controller"
+    check_status "Controller" "$ARGOCD_NAMESPACE" "statefulset" "argocd-application-controller"
     check_status "Repo Server" "$ARGOCD_NAMESPACE" "deployment" "argocd-repo-server"
 
     # Get application status

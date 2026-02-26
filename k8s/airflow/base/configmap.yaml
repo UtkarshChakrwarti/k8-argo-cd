@@ -1,6 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   name: airflow-config
   namespace: airflow-core
 data:
@@ -42,6 +44,8 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   name: airflow-pod-template
   namespace: airflow-core
 data:

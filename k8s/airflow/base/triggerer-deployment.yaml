@@ -1,6 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
   name: airflow-triggerer
   namespace: airflow-core
 spec:
@@ -10,6 +12,8 @@ spec:
       app: airflow-triggerer
   template:
     metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "3"
       labels:
         app: airflow-triggerer
     spec:

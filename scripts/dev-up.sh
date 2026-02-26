@@ -262,18 +262,33 @@ patch_child_apps() {
 
 # ─── Wait for Airflow to be healthy ──────────────────────────────────────────
 wait_for_airflow() {
-    log_info "Waiting for Airflow webserver (may take 5-7 min)..."
-    for i in $(seq 1 400); do
-        if kubectl wait --for=condition=available --timeout=5s \
-            deployment/dev-airflow-webserver -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
-            log_success "Airflow webserver is ready"
-            return 0
-        fi
-        [ $((i % 10)) -eq 0 ] && echo -n " ${i}s" || echo -n "."
-        sleep 1
+    local deployments=(
+        dev-airflow-dag-sync
+        dev-airflow-dag-processor
+        dev-airflow-scheduler
+        dev-airflow-webserver
+        dev-airflow-triggerer
+    )
+
+    log_info "Waiting for all Airflow deployments (may take 5-7 min)..."
+    for deploy in "${deployments[@]}"; do
+        local label="${deploy#dev-airflow-}"
+        echo -n "  ${label}: "
+        for i in $(seq 1 400); do
+            if kubectl wait --for=condition=available --timeout=5s \
+                "deployment/${deploy}" -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
+                echo " ready"
+                break
+            fi
+            [ $((i % 10)) -eq 0 ] && echo -n " ${i}s" || echo -n "."
+            sleep 1
+            if [ "$i" -eq 400 ]; then
+                echo " TIMEOUT"
+                log_warning "${deploy} not ready - check: kubectl get pods -n airflow"
+            fi
+        done
     done
-    echo ""
-    log_warning "Airflow webserver not ready within timeout - check: kubectl get pods -n airflow"
+    log_success "All Airflow components are ready"
 }
 
 # ─── Port-forward Airflow UI ──────────────────────────────────────────────────

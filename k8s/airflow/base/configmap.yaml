@@ -44,7 +44,7 @@ data:
           args:
             - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
             - --ref=main
-            - --one-shot
+            - --one-time
             - --link=repo
             - --root=/git
           volumeMounts:

@@ -5,9 +5,10 @@ resources:
   - serviceaccount.yaml
   - configmap.yaml
   - migrate-job.yaml
+  - dags-pvc.yaml
+  - dag-sync-deployment.yaml
   - webserver-deployment.yaml
   - scheduler-deployment.yaml
-  - dag-processor-deployment.yaml
   - triggerer-deployment.yaml
   - logs-pvc.yaml
   - webserver-service.yaml

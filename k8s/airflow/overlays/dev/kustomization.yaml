@@ -19,3 +19,5 @@ replicas:
     count: 1
   - name: airflow-triggerer
     count: 1
+  - name: airflow-dag-sync
+    count: 1

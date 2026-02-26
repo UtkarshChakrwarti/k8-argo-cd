@@ -1,0 +1,20 @@
+# dags-pvc.yaml
+# Shared PVC for Airflow DAGs — a single git-sync Deployment writes here
+# and all Airflow pods (scheduler, webserver, triggerer) mount it.
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dags-pvc
+  namespace: airflow
+  labels:
+    app: airflow
+    environment: dev
+    part-of: gitops-poc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: "standard"

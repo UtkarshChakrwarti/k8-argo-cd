@@ -19,7 +19,7 @@ AIRFLOW_NAMESPACE="airflow"
 AIRFLOW_PORT="${AIRFLOW_PORT:-8090}"
 
 # Check if service exists
-if ! kubectl get service airflow-webserver -n "$AIRFLOW_NAMESPACE" &> /dev/null; then
+if ! kubectl get service dev-airflow-webserver -n "$AIRFLOW_NAMESPACE" &> /dev/null; then
     log_info "Airflow webserver service not found in namespace '$AIRFLOW_NAMESPACE'"
     exit 1
 fi
@@ -28,4 +28,4 @@ log_success "Setting up port-forward to Airflow webserver on port $AIRFLOW_PORT.
 log_info "Access Airflow at: http://localhost:$AIRFLOW_PORT"
 log_info "Press Ctrl+C to stop port-forward"
 
-sudo kubectl port-forward -n "$AIRFLOW_NAMESPACE" svc/airflow-webserver "$AIRFLOW_PORT:8080"
+sudo kubectl port-forward -n "$AIRFLOW_NAMESPACE" svc/dev-airflow-webserver "$AIRFLOW_PORT:8080"

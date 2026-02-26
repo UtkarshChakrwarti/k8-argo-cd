@@ -262,8 +262,8 @@ patch_child_apps() {
 
 # ─── Wait for Airflow to be healthy ──────────────────────────────────────────
 wait_for_airflow() {
-    log_info "Waiting for Airflow webserver (may take 3-5 min)..."
-    for i in $(seq 1 180); do
+    log_info "Waiting for Airflow webserver (may take 5-7 min)..."
+    for i in $(seq 1 400); do
         if kubectl wait --for=condition=available --timeout=5s \
             deployment/dev-airflow-webserver -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
             log_success "Airflow webserver is ready"

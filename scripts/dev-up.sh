@@ -74,6 +74,17 @@ EOF
     kind create cluster --config "$KIND_CONFIG" || { log_error "Failed to create cluster"; return 1; }
     kubectl cluster-info --context "kind-${CLUSTER_NAME}" >/dev/null 2>&1
     log_success "Kind cluster created"
+
+    # Pre-load git-sync image to avoid transient registry.k8s.io TLS timeouts
+    log_info "Pre-loading git-sync image into Kind nodes..."
+    if docker pull registry.k8s.io/git-sync/git-sync:v4.2.3 2>/dev/null; then
+        docker save registry.k8s.io/git-sync/git-sync:v4.2.3 | \
+            kind load image-archive /dev/stdin --name "$CLUSTER_NAME" 2>/dev/null && \
+            log_success "git-sync image pre-loaded" || \
+            log_warning "Could not pre-load git-sync image, Kind nodes will pull it"
+    else
+        log_warning "Could not pull git-sync image, Kind nodes will pull it directly"
+    fi
 }
 
 

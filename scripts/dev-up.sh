@@ -12,7 +12,8 @@ NC='\033[0m'
 CLUSTER_NAME="gitops-poc"
 ARGOCD_NAMESPACE="argocd"
 MYSQL_NAMESPACE="mysql"
-AIRFLOW_NAMESPACE="airflow"
+AIRFLOW_CORE_NAMESPACE="airflow-core"
+AIRFLOW_USER_NAMESPACE="airflow-user"
 KIND_CONFIG="/tmp/kind-config.yaml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_URL="https://github.com/UtkarshChakrwarti/k8-argo-cd.git"
@@ -141,17 +142,15 @@ install_argocd() {
 # ─── Namespaces ───────────────────────────────────────────────────────────────
 create_namespaces() {
     log_info "Creating namespaces..."
-    for ns in "$MYSQL_NAMESPACE" "$AIRFLOW_NAMESPACE"; do
+    for ns in "$MYSQL_NAMESPACE" "$AIRFLOW_CORE_NAMESPACE" "$AIRFLOW_USER_NAMESPACE"; do
         kubectl get namespace "$ns" &>/dev/null || kubectl create namespace "$ns"
     done
-    log_success "Namespaces ready"
+    log_success "Namespaces ready: $MYSQL_NAMESPACE, $AIRFLOW_CORE_NAMESPACE, $AIRFLOW_USER_NAMESPACE"
 }
 
 # ─── MySQL secret ─────────────────────────────────────────────────────────────
 create_mysql_secret() {
     log_info "Creating MySQL secrets..."
-    # Kustomize overlay adds "dev-" prefix to all resource names, so secrets
-    # created here must match the prefixed names that pods will reference.
     if kubectl get secret mysql-secret -n "$MYSQL_NAMESPACE" &>/dev/null; then
         log_warning "MySQL secret already exists, skipping"
         AIRFLOW_DB_PASSWORD=$(kubectl get secret mysql-secret -n "$MYSQL_NAMESPACE" \
@@ -193,11 +192,11 @@ EOF
     log_success "MySQL secret created"
 }
 
-# ─── Airflow secret ───────────────────────────────────────────────────────────
+# ─── Airflow secret (in BOTH namespaces) ─────────────────────────────────────
 create_airflow_secret() {
-    log_info "Creating Airflow secrets..."
-    if kubectl get secret airflow-secret -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
-        log_warning "Airflow secret already exists, skipping"
+    log_info "Creating Airflow secrets in both namespaces..."
+    if kubectl get secret airflow-secret -n "$AIRFLOW_CORE_NAMESPACE" &>/dev/null; then
+        log_warning "Airflow secret already exists in $AIRFLOW_CORE_NAMESPACE, skipping"
         return 0
     fi
     AIRFLOW_FERNET_KEY="${AIRFLOW_FERNET_KEY:-$(python3 -c \
@@ -206,17 +205,25 @@ create_airflow_secret() {
     AIRFLOW_API_JWT_SECRET="${AIRFLOW_API_JWT_SECRET:-$(openssl rand -base64 32)}"
     AIRFLOW_ADMIN_PASSWORD="admin"
 
-    # Airflow 3.0: correct key is AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-    # MySQL service is "dev-mysql" after kustomize namePrefix
+    # MySQL service is "dev-mysql" after kustomize namePrefix in mysql overlay
     SQL_ALCHEMY_CONN="mysql+pymysql://airflow:${AIRFLOW_DB_PASSWORD}@dev-mysql.mysql.svc.cluster.local:3306/airflow"
 
+    # Create full secret in airflow-core namespace
     kubectl create secret generic airflow-secret \
         --from-literal=AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="$SQL_ALCHEMY_CONN" \
         --from-literal=AIRFLOW__CORE__FERNET_KEY="$AIRFLOW_FERNET_KEY" \
         --from-literal=AIRFLOW__WEBSERVER__SECRET_KEY="$AIRFLOW_WEBSERVER_SECRET_KEY" \
         --from-literal=AIRFLOW__API_AUTH__JWT_SECRET="$AIRFLOW_API_JWT_SECRET" \
         --from-literal=admin-password="$AIRFLOW_ADMIN_PASSWORD" \
-        -n "$AIRFLOW_NAMESPACE" || { log_error "Failed to create Airflow secret"; return 1; }
+        -n "$AIRFLOW_CORE_NAMESPACE" || { log_error "Failed to create Airflow secret in $AIRFLOW_CORE_NAMESPACE"; return 1; }
+    log_success "Airflow secret created in $AIRFLOW_CORE_NAMESPACE"
+
+    # Create secret in airflow-user namespace (task pods need DB conn)
+    kubectl create secret generic airflow-secret \
+        --from-literal=AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="$SQL_ALCHEMY_CONN" \
+        --from-literal=AIRFLOW__CORE__FERNET_KEY="$AIRFLOW_FERNET_KEY" \
+        -n "$AIRFLOW_USER_NAMESPACE" || { log_error "Failed to create Airflow secret in $AIRFLOW_USER_NAMESPACE"; return 1; }
+    log_success "Airflow secret created in $AIRFLOW_USER_NAMESPACE"
 
     cat > "$SCRIPT_DIR/.airflow-credentials.txt" <<EOF
 # Airflow Credentials (DO NOT COMMIT)
@@ -227,10 +234,12 @@ SQL_ALCHEMY_CONN=$SQL_ALCHEMY_CONN
 Airflow UI:   http://localhost:8090
   username:   admin
   password:   $AIRFLOW_ADMIN_PASSWORD
+Namespaces:
+  Control plane: $AIRFLOW_CORE_NAMESPACE
+  Task pods:     $AIRFLOW_USER_NAMESPACE (default), $AIRFLOW_CORE_NAMESPACE (via executor_config)
 EOF
     chmod 600 "$SCRIPT_DIR/.airflow-credentials.txt"
     log_warning "Airflow credentials saved to .airflow-credentials.txt"
-    log_success "Airflow secret created"
 }
 
 # ─── Bootstrap Argo CD root app ───────────────────────────────────────────────
@@ -282,11 +291,11 @@ patch_child_apps() {
 # ─── Wait for Airflow to be healthy ──────────────────────────────────────────
 wait_for_airflow() {
     local deployments=(
-        "dev-airflow-dag-sync"
-        "dev-airflow-dag-processor"
-        "dev-airflow-scheduler"
-        "dev-airflow-webserver"
-        "dev-airflow-triggerer"
+        "airflow-dag-sync"
+        "airflow-dag-processor"
+        "airflow-scheduler"
+        "airflow-webserver"
+        "airflow-triggerer"
     )
 
     # Phase 1: Wait for ArgoCD to create the deployments (up to 120s)
@@ -295,7 +304,7 @@ wait_for_airflow() {
     while true; do
         local all_exist=true
         for dep in "${deployments[@]}"; do
-            if ! kubectl get deployment "$dep" -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
+            if ! kubectl get deployment "$dep" -n "$AIRFLOW_CORE_NAMESPACE" &>/dev/null; then
                 all_exist=false
                 break
             fi
@@ -315,17 +324,17 @@ wait_for_airflow() {
     # Phase 2: Wait for all deployments to become available
     log_info "Waiting for Airflow pods to be ready (may take 3-5 min)..."
     if kubectl wait --for=condition=available --timeout=300s \
-        deployment/dev-airflow-dag-sync \
-        deployment/dev-airflow-dag-processor \
-        deployment/dev-airflow-scheduler \
-        deployment/dev-airflow-webserver \
-        deployment/dev-airflow-triggerer \
-        -n "$AIRFLOW_NAMESPACE" 2>&1 | while read -r line; do
+        deployment/airflow-dag-sync \
+        deployment/airflow-dag-processor \
+        deployment/airflow-scheduler \
+        deployment/airflow-webserver \
+        deployment/airflow-triggerer \
+        -n "$AIRFLOW_CORE_NAMESPACE" 2>&1 | while read -r line; do
             echo "  ${line}"
         done; then
         log_success "All Airflow components are ready"
     else
-        log_warning "Some deployments not ready — check: kubectl get pods -n airflow"
+        log_warning "Some deployments not ready — check: kubectl get pods -n $AIRFLOW_CORE_NAMESPACE"
     fi
 }
 
@@ -335,17 +344,8 @@ setup_airflow_portforward() {
     pkill -f "kubectl port-forward.*airflow.*8090" 2>/dev/null || true
     sleep 1
     log_info "Starting Airflow port-forward on localhost:8090..."
-    kubectl port-forward -n "$AIRFLOW_NAMESPACE" svc/dev-airflow-webserver 8090:8080 \
+    kubectl port-forward -n "$AIRFLOW_CORE_NAMESPACE" svc/airflow-webserver 8090:8080 \
         --address 0.0.0.0 >/dev/null 2>&1 &
-    # Fetch the dynamically generated Airflow password for the admin user
-    log_info "Fetching generated Airflow password..."
-    local gen_pass
-    gen_pass=$(kubectl exec -n "$AIRFLOW_NAMESPACE" deploy/dev-airflow-webserver -c webserver -- python3 -c "import airflow.api_fastapi.auth.managers.simple.simple_auth_manager as m; users = m.SimpleAuthManager.get_users(); print(m.SimpleAuthManager.get_passwords(users)['admin'])" 2>/dev/null || echo "admin")
-    
-    # Update the credentials file with the actual working password
-    sed -i.bak "s/password:.*admin/password:   $gen_pass/" "$SCRIPT_DIR/.airflow-credentials.txt" 2>/dev/null || true
-    rm -f "$SCRIPT_DIR/.airflow-credentials.txt.bak"
-
     log_success "Airflow UI available at http://localhost:8090"
 }
 
@@ -385,19 +385,19 @@ setup_mysql_portforward() {
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
 print_summary() {
-    local admin_pass=""
-    [ -f "$SCRIPT_DIR/.airflow-credentials.txt" ] && \
-        admin_pass=$(grep "AIRFLOW_ADMIN_PASSWORD=" "$SCRIPT_DIR/.airflow-credentials.txt" | cut -d= -f2)
-
     echo ""
     log_success "══════════════════════════════════════════"
-    log_success " GitOps POC - Local Stack Ready!"
+    log_success " GitOps POC - Multi-Namespace Airflow Ready!"
     log_success "══════════════════════════════════════════"
     echo ""
     echo "  Argo CD UI   →  https://localhost:8080  (see .argocd-credentials.txt)"
     echo "  Airflow UI   →  http://localhost:8090   (see .airflow-credentials.txt)"
     echo "  MySQL DB     →  127.0.0.1:3306          (see .mysql-credentials.txt)"
     echo "  Git repo     →  ${REPO_URL}"
+    echo ""
+    echo "  Namespaces:"
+    echo "    airflow-core  →  scheduler, webserver, triggerer, dag-processor, git-sync"
+    echo "    airflow-user  →  task pods (default KubernetesExecutor target)"
     echo ""
     echo "  make status      – component health"
     echo "  make logs        – tail logs"
@@ -407,7 +407,7 @@ print_summary() {
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 main() {
-    log_info "Starting local GitOps POC..."
+    log_info "Starting local GitOps POC (multi-namespace Airflow)..."
     check_prerequisites     || exit 1
     verify_repo_access      || exit 1
     create_kind_cluster     || exit 1

@@ -6,6 +6,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: airflow-dag-sync
+  namespace: airflow-core
 spec:
   replicas: 1
   selector:
@@ -38,4 +39,4 @@ spec:
       volumes:
         - name: dags
           persistentVolumeClaim:
-            claimName: dev-dags-pvc
+            claimName: dags-pvc

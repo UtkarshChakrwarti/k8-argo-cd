@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: airflow-triggerer
+  namespace: airflow-core
 spec:
   replicas: 1
   selector:
@@ -12,7 +13,7 @@ spec:
       labels:
         app: airflow-triggerer
     spec:
-      serviceAccountName: airflow
+      serviceAccountName: airflow-triggerer
       containers:
         - name: triggerer
           image: apache/airflow:3.0.0-python3.12
@@ -37,11 +38,23 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 30
             failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 50000
 
       volumes:
         - name: airflow-logs
           persistentVolumeClaim:
-            claimName: dev-logs-local-pvc
+            claimName: logs-local-pvc
         - name: dags
           persistentVolumeClaim:
-            claimName: dev-dags-pvc
+            claimName: dags-pvc

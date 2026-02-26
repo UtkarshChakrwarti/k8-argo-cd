@@ -2,13 +2,18 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: airflow-db-migrate
+  namespace: airflow-core
   annotations:
     argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
 spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
   template:
     spec:
-      restartPolicy: Never
+      serviceAccountName: airflow-db-migrate
+      restartPolicy: OnFailure
       initContainers:
         - name: wait-for-mysql
           image: apache/airflow:3.0.0-python3.12
@@ -35,6 +40,11 @@ spec:
           envFrom:
             - secretRef:
                 name: airflow-secret
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 50000
       containers:
         - name: airflow-migrate
           image: apache/airflow:3.0.0-python3.12
@@ -45,7 +55,18 @@ spec:
           volumeMounts:
             - name: airflow-logs
               mountPath: /home/airflow/logs
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 50000
       volumes:
         - name: airflow-logs
           emptyDir: {}
-  backoffLimit: 6

@@ -4,13 +4,13 @@ kind: Kustomization
 resources:
   - ../../base
 
-namespace: airflow
-
-namePrefix: dev-
+# No namespace override — namespaces are hardcoded per-resource in base manifests
+# No namePrefix — resources use their actual names for cross-namespace references
 
 labels:
   - pairs:
       environment: dev
+    includeSelectors: false
 
 replicas:
   - name: airflow-webserver

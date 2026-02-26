@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: airflow-core
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: airflow-user

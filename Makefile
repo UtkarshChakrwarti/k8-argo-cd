@@ -75,19 +75,22 @@ logs:
 	@kubectl logs -n mysql statefulset/dev-mysql --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== Airflow Webserver Logs ===$(NC)"
-	@kubectl logs -n airflow deployment/dev-airflow-webserver -c webserver --tail=50 || true
+	@kubectl logs -n airflow-core deployment/airflow-webserver -c webserver --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== Airflow Scheduler Logs ===$(NC)"
-	@kubectl logs -n airflow deployment/dev-airflow-scheduler -c scheduler --tail=50 || true
+	@kubectl logs -n airflow-core deployment/airflow-scheduler -c scheduler --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== Airflow Triggerer Logs ===$(NC)"
-	@kubectl logs -n airflow deployment/dev-airflow-triggerer -c triggerer --tail=50 || true
+	@kubectl logs -n airflow-core deployment/airflow-triggerer -c triggerer --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== Airflow DAG Processor Logs ===$(NC)"
-	@kubectl logs -n airflow deployment/dev-airflow-dag-processor -c dag-processor --tail=50 || true
+	@kubectl logs -n airflow-core deployment/airflow-dag-processor -c dag-processor --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== Airflow DAG Sync Logs ===$(NC)"
-	@kubectl logs -n airflow deployment/dev-airflow-dag-sync -c git-sync --tail=50 || true
+	@kubectl logs -n airflow-core deployment/airflow-dag-sync -c git-sync --tail=50 || true
+	@echo ""
+	@echo "$(BLUE)=== Airflow User Task Pods ===$(NC)"
+	@kubectl get pods -n airflow-user --show-labels 2>/dev/null || echo "No task pods"
 
 # Validate manifests
 validate:
@@ -99,7 +102,7 @@ validate:
 # Clean up credentials
 clean:
 	@echo "$(YELLOW)Removing credential files...$(NC)"
-	@rm -f .mysql-credentials.txt .airflow-credentials.txt
+	@rm -f .mysql-credentials.txt .airflow-credentials.txt .argocd-credentials.txt
 	@echo "$(GREEN)Cleaned up$(NC)"
 
 # Install prerequisites

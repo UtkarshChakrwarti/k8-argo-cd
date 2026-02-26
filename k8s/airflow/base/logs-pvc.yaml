@@ -1,14 +1,13 @@
 # logs-pvc.yaml
-# Define the PVC for Airflow logs using production-grade dynamic provisioning.
+# PVC for Airflow logs using dynamic provisioning.
 
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: logs-local-pvc
-  namespace: airflow
+  namespace: airflow-core
   labels:
     app: airflow
-    environment: dev
     part-of: gitops-poc
 spec:
   accessModes:
@@ -16,4 +15,4 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: "standard" # Use dynamic provisioning
+  storageClassName: "standard"

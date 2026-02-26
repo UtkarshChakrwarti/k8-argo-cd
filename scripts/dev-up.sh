@@ -75,16 +75,21 @@ EOF
     kubectl cluster-info --context "kind-${CLUSTER_NAME}" >/dev/null 2>&1
     log_success "Kind cluster created"
 
-    # Pre-load git-sync image to avoid transient registry.k8s.io TLS timeouts
-    log_info "Pre-loading git-sync image into Kind nodes..."
-    if docker pull registry.k8s.io/git-sync/git-sync:v4.2.3 2>/dev/null; then
-        docker save registry.k8s.io/git-sync/git-sync:v4.2.3 | \
-            kind load image-archive /dev/stdin --name "$CLUSTER_NAME" 2>/dev/null && \
-            log_success "git-sync image pre-loaded" || \
-            log_warning "Could not pre-load git-sync image, Kind nodes will pull it"
-    else
-        log_warning "Could not pull git-sync image, Kind nodes will pull it directly"
-    fi
+    # Pre-load container images to avoid slow in-cluster pulls
+    log_info "Pre-loading container images into Kind (speeds up first deploy)..."
+    local images=(
+        "apache/airflow:3.0.0-python3.12"
+        "registry.k8s.io/git-sync/git-sync:v4.2.3"
+    )
+    for img in "${images[@]}"; do
+        if docker image inspect "$img" &>/dev/null || docker pull "$img" 2>/dev/null; then
+            docker save "$img" | kind load image-archive /dev/stdin --name "$CLUSTER_NAME" 2>/dev/null && \
+                log_success "  ${img##*/} loaded" || \
+                log_warning "  ${img##*/} — kind load failed, nodes will pull it"
+        else
+            log_warning "  ${img##*/} — pull failed, nodes will pull it directly"
+        fi
+    done
 }
 
 
@@ -273,33 +278,22 @@ patch_child_apps() {
 
 # ─── Wait for Airflow to be healthy ──────────────────────────────────────────
 wait_for_airflow() {
-    local deployments=(
-        dev-airflow-dag-sync
-        dev-airflow-dag-processor
-        dev-airflow-scheduler
-        dev-airflow-webserver
-        dev-airflow-triggerer
-    )
+    log_info "Waiting for all Airflow deployments (may take 3-5 min)..."
 
-    log_info "Waiting for all Airflow deployments (may take 5-7 min)..."
-    for deploy in "${deployments[@]}"; do
-        local label="${deploy#dev-airflow-}"
-        echo -n "  ${label}: "
-        for i in $(seq 1 400); do
-            if kubectl wait --for=condition=available --timeout=5s \
-                "deployment/${deploy}" -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
-                echo " ready"
-                break
-            fi
-            [ $((i % 10)) -eq 0 ] && echo -n " ${i}s" || echo -n "."
-            sleep 1
-            if [ "$i" -eq 400 ]; then
-                echo " TIMEOUT"
-                log_warning "${deploy} not ready - check: kubectl get pods -n airflow"
-            fi
-        done
-    done
-    log_success "All Airflow components are ready"
+    # Wait for ALL deployments in parallel with a single kubectl wait
+    if kubectl wait --for=condition=available --timeout=300s \
+        deployment/dev-airflow-dag-sync \
+        deployment/dev-airflow-dag-processor \
+        deployment/dev-airflow-scheduler \
+        deployment/dev-airflow-webserver \
+        deployment/dev-airflow-triggerer \
+        -n "$AIRFLOW_NAMESPACE" 2>&1 | while read -r line; do
+            echo "  ${line}"
+        done; then
+        log_success "All Airflow components are ready"
+    else
+        log_warning "Some deployments not ready — check: kubectl get pods -n airflow"
+    fi
 }
 
 # ─── Port-forward Airflow UI ──────────────────────────────────────────────────

@@ -3,6 +3,7 @@
 .mysql-credentials.txt
 .webui_secret_key
 .argocd-password
+.argocd-credentials.txt
 .airflow-password
 .mysql-password
 

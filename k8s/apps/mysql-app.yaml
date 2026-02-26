@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/UtkarshChakrwarti/k8-argo-cd.git
     path: k8s/mysql/overlays/dev
-    targetRevision: main
+    targetRevision: feature/multi-namespace-executor
   destination:
     server: https://kubernetes.default.svc
     namespace: mysql

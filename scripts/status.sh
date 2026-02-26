@@ -16,6 +16,7 @@ ARGOCD_NAMESPACE="argocd"
 MYSQL_NAMESPACE="mysql"
 AIRFLOW_CORE_NAMESPACE="airflow-core"
 AIRFLOW_USER_NAMESPACE="airflow-user"
+MONITORING_NAMESPACE="monitoring"
 
 # Helper functions
 log_info() {
@@ -71,7 +72,7 @@ main() {
 
     # MySQL status
     log_section "MySQL (namespace: $MYSQL_NAMESPACE)"
-    check_status "MySQL StatefulSet" "$MYSQL_NAMESPACE" "statefulset" "mysql"
+    check_status "MySQL StatefulSet" "$MYSQL_NAMESPACE" "statefulset" "dev-mysql"
 
     # Show MySQL pod status
     log_info "MySQL Pods:"
@@ -94,6 +95,13 @@ main() {
     log_section "Airflow Task Pods (namespace: $AIRFLOW_USER_NAMESPACE)"
     log_info "Task Pods:"
     kubectl get pods -n "$AIRFLOW_USER_NAMESPACE" -o wide 2>/dev/null || echo "No task pods running"
+    echo ""
+
+    # Monitoring status
+    log_section "Monitoring UI (namespace: $MONITORING_NAMESPACE)"
+    check_status "Kube Ops View" "$MONITORING_NAMESPACE" "deployment" "kube-ops-view"
+    log_info "Monitoring Pods:"
+    kubectl get pods -n "$MONITORING_NAMESPACE" -o wide 2>/dev/null || echo "Monitoring namespace not ready yet"
     echo ""
 
     # Node status

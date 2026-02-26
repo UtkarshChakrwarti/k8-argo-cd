@@ -14,9 +14,16 @@ ARGOCD_NAMESPACE="argocd"
 MYSQL_NAMESPACE="mysql"
 AIRFLOW_CORE_NAMESPACE="airflow-core"
 AIRFLOW_USER_NAMESPACE="airflow-user"
+MONITORING_NAMESPACE="monitoring"
 KIND_CONFIG="/tmp/kind-config.yaml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_URL="https://github.com/UtkarshChakrwarti/k8-argo-cd.git"
+MONITORING_PORT="${MONITORING_PORT:-8091}"
+GIT_BIN="/opt/homebrew/bin/git"
+if ! command -v "$GIT_BIN" &>/dev/null; then
+    GIT_BIN="git"
+fi
+GIT_REVISION="${GIT_REVISION:-$("$GIT_BIN" -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo feature/multi-namespace-executor)}"
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -41,7 +48,7 @@ check_prerequisites() {
 # ─── Verify GitHub repo is reachable ──────────────────────────────────────────
 verify_repo_access() {
     log_info "Verifying access to ${REPO_URL}..."
-    git ls-remote "$REPO_URL" HEAD &>/dev/null || {
+    "$GIT_BIN" ls-remote "$REPO_URL" HEAD &>/dev/null || {
         log_error "Cannot reach ${REPO_URL} – check network or repo permissions"
         return 1
     }
@@ -142,10 +149,10 @@ install_argocd() {
 # ─── Namespaces ───────────────────────────────────────────────────────────────
 create_namespaces() {
     log_info "Creating namespaces..."
-    for ns in "$MYSQL_NAMESPACE" "$AIRFLOW_CORE_NAMESPACE" "$AIRFLOW_USER_NAMESPACE"; do
+    for ns in "$MYSQL_NAMESPACE" "$AIRFLOW_CORE_NAMESPACE" "$AIRFLOW_USER_NAMESPACE" "$MONITORING_NAMESPACE"; do
         kubectl get namespace "$ns" &>/dev/null || kubectl create namespace "$ns"
     done
-    log_success "Namespaces ready: $MYSQL_NAMESPACE, $AIRFLOW_CORE_NAMESPACE, $AIRFLOW_USER_NAMESPACE"
+    log_success "Namespaces ready: $MYSQL_NAMESPACE, $AIRFLOW_CORE_NAMESPACE, $AIRFLOW_USER_NAMESPACE, $MONITORING_NAMESPACE"
 }
 
 # ─── MySQL secret ─────────────────────────────────────────────────────────────
@@ -244,7 +251,7 @@ EOF
 
 # ─── Bootstrap Argo CD root app ───────────────────────────────────────────────
 bootstrap_argocd() {
-    log_info "Bootstrapping Argo CD root app (REPO_URL=${REPO_URL})..."
+    log_info "Bootstrapping Argo CD root app (REPO_URL=${REPO_URL}, REV=${GIT_REVISION})..."
     local temp_app
     temp_app=$(mktemp)
     sed "s|\${REPO_URL}|${REPO_URL}|g" "$SCRIPT_DIR/k8s/apps/app-of-apps.yaml" > "$temp_app"
@@ -252,7 +259,7 @@ bootstrap_argocd() {
     if kubectl get application root-app -n "$ARGOCD_NAMESPACE" &>/dev/null; then
         kubectl patch application root-app -n "$ARGOCD_NAMESPACE" \
             --type merge \
-            -p "{\"spec\":{\"source\":{\"repoURL\":\"${REPO_URL}\"}}}" || {
+            -p "{\"spec\":{\"source\":{\"repoURL\":\"${REPO_URL}\",\"targetRevision\":\"${GIT_REVISION}\"}}}" || {
             rm "$temp_app"; log_error "Failed to patch root-app"; return 1
         }
     else
@@ -266,8 +273,8 @@ bootstrap_argocd() {
 
 # ─── Patch / create child apps ────────────────────────────────────────────────
 patch_child_apps() {
-    log_info "Creating/patching child Argo CD apps..."
-    for app in mysql-app airflow-app; do
+    log_info "Creating/patching child Argo CD apps (REV=${GIT_REVISION})..."
+    for app in mysql-app airflow-app monitoring-app; do
         local temp_app
         temp_app=$(mktemp)
         sed "s|\${REPO_URL}|${REPO_URL}|g" "$SCRIPT_DIR/k8s/apps/${app}.yaml" > "$temp_app"
@@ -275,7 +282,7 @@ patch_child_apps() {
         if kubectl get application "$app" -n "$ARGOCD_NAMESPACE" &>/dev/null; then
             kubectl patch application "$app" -n "$ARGOCD_NAMESPACE" \
                 --type merge \
-                -p "{\"spec\":{\"source\":{\"repoURL\":\"${REPO_URL}\"}}}" || {
+                -p "{\"spec\":{\"source\":{\"repoURL\":\"${REPO_URL}\",\"targetRevision\":\"${GIT_REVISION}\"}}}" || {
                 rm "$temp_app"; log_error "Failed to patch ${app}"; return 1
             }
         else
@@ -286,6 +293,30 @@ patch_child_apps() {
         rm "$temp_app"
         log_success "  ${app} ready"
     done
+}
+
+# ─── Wait for monitoring UI ───────────────────────────────────────────────────
+wait_for_monitoring() {
+    log_info "Waiting for monitoring deployment..."
+    local deadline=$((SECONDS + 120))
+    while true; do
+        if kubectl get deployment kube-ops-view -n "$MONITORING_NAMESPACE" &>/dev/null; then
+            break
+        fi
+        if [ $SECONDS -ge $deadline ]; then
+            log_warning "Timeout waiting for monitoring deployment creation"
+            log_warning "Check ArgoCD sync status: argocd app get monitoring-app"
+            return 1
+        fi
+        sleep 5
+    done
+
+    if kubectl wait --for=condition=available --timeout=180s \
+        deployment/kube-ops-view -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+        log_success "Monitoring UI deployment is ready"
+    else
+        log_warning "Monitoring deployment is not ready yet"
+    fi
 }
 
 # ─── Wait for Airflow to be healthy ──────────────────────────────────────────
@@ -383,6 +414,16 @@ setup_mysql_portforward() {
     log_success "MySQL DB accessible at 127.0.0.1:3306"
 }
 
+# ─── Port-forward Monitoring UI ───────────────────────────────────────────────
+setup_monitoring_portforward() {
+    pkill -f "kubectl port-forward.*kube-ops-view.*${MONITORING_PORT}" 2>/dev/null || true
+    sleep 1
+    log_info "Starting Monitoring UI port-forward on localhost:${MONITORING_PORT}..."
+    kubectl port-forward -n "$MONITORING_NAMESPACE" svc/kube-ops-view "${MONITORING_PORT}:80" \
+        --address 0.0.0.0 >/dev/null 2>&1 &
+    log_success "Monitoring UI available at http://localhost:${MONITORING_PORT}"
+}
+
 # ─── Summary ──────────────────────────────────────────────────────────────────
 print_summary() {
     echo ""
@@ -393,11 +434,13 @@ print_summary() {
     echo "  Argo CD UI   →  https://localhost:8080  (see .argocd-credentials.txt)"
     echo "  Airflow UI   →  http://localhost:8090   (see .airflow-credentials.txt)"
     echo "  MySQL DB     →  127.0.0.1:3306          (see .mysql-credentials.txt)"
+    echo "  Monitoring   →  http://localhost:${MONITORING_PORT}"
     echo "  Git repo     →  ${REPO_URL}"
     echo ""
     echo "  Namespaces:"
     echo "    airflow-core  →  scheduler, webserver, triggerer, dag-processor, git-sync"
     echo "    airflow-user  →  task pods (default KubernetesExecutor target)"
+    echo "    monitoring    →  kube-ops-view (cluster pods UI)"
     echo ""
     echo "  make status      – component health"
     echo "  make logs        – tail logs"
@@ -419,9 +462,11 @@ main() {
     bootstrap_argocd        || exit 1
     patch_child_apps        || exit 1
     wait_for_airflow        || true
+    wait_for_monitoring     || true
     setup_argocd_portforward  || true
     setup_airflow_portforward || true
     setup_mysql_portforward   || true
+    setup_monitoring_portforward || true
     print_summary
 }
 

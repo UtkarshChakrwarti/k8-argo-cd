@@ -1,4 +1,4 @@
-.PHONY: help dev-up dev-down status argocd-ui airflow-ui logs clean install-prereqs build-dag-sync
+.PHONY: help dev-up dev-down status argocd-ui airflow-ui monitoring-ui logs clean install-prereqs build-dag-sync sanity
 
 # Colors
 BLUE := \033[0;34m
@@ -22,12 +22,15 @@ help:
 	@echo "  make status              - Show status of all components"
 	@echo "  make argocd-ui           - Open Argo CD UI (requires port-forward)"
 	@echo "  make airflow-ui          - Open Airflow UI (requires port-forward)"
+	@echo "  make monitoring-ui       - Open Monitoring UI (requires port-forward)"
 	@echo "  make logs                - Show logs from all components"
+	@echo "  make sanity              - Run repo and manifest sanity checks"
 	@echo "  make help                - Show this help message"
 	@echo ""
 	@echo "$(GREEN)Advanced:$(NC)"
 	@echo "  make argocd-port-forward - Manually port-forward Argo CD (8080)"
 	@echo "  make airflow-port-forward - Manually port-forward Airflow (8090)"
+	@echo "  make monitoring-port-forward - Manually port-forward Monitoring (8091)"
 	@echo "  make validate            - Validate k8s manifests with kustomize"
 	@echo "  make build-dag-sync      - Build & load dag-sync image into Kind"
 	@echo "  make clean               - Remove credential files"
@@ -54,6 +57,10 @@ argocd-port-forward:
 airflow-port-forward:
 	@$(SCRIPTS_DIR)/airflow-port-forward.sh
 
+# Port-forward Monitoring
+monitoring-port-forward:
+	@$(SCRIPTS_DIR)/monitoring-port-forward.sh
+
 # Open Argo CD UI
 argocd-ui: argocd-port-forward
 	@echo "$(GREEN)Opening Argo CD UI...$(NC)"
@@ -65,6 +72,12 @@ airflow-ui: airflow-port-forward
 	@echo "$(GREEN)Opening Airflow UI...$(NC)"
 	@sleep 2
 	@"$$BROWSER" http://localhost:8090 || echo "Please open http://localhost:8090 in your browser"
+
+# Open Monitoring UI
+monitoring-ui: monitoring-port-forward
+	@echo "$(GREEN)Opening Monitoring UI...$(NC)"
+	@sleep 2
+	@"$$BROWSER" http://localhost:8091 || echo "Please open http://localhost:8091 in your browser"
 
 # Show logs
 logs:
@@ -91,13 +104,21 @@ logs:
 	@echo ""
 	@echo "$(BLUE)=== Airflow User Task Pods ===$(NC)"
 	@kubectl get pods -n airflow-user --show-labels 2>/dev/null || echo "No task pods"
+	@echo ""
+	@echo "$(BLUE)=== Monitoring Logs ===$(NC)"
+	@kubectl logs -n monitoring deployment/kube-ops-view --tail=50 || true
 
 # Validate manifests
 validate:
 	@echo "$(GREEN)Validating k8s manifests...$(NC)"
 	@kubectl kustomize k8s/mysql/overlays/dev > /dev/null && echo "$(GREEN)✓ MySQL manifests valid$(NC)" || (echo "$(YELLOW)✗ MySQL manifests invalid$(NC)" && false)
 	@kubectl kustomize k8s/airflow/overlays/dev > /dev/null && echo "$(GREEN)✓ Airflow manifests valid$(NC)" || (echo "$(YELLOW)✗ Airflow manifests invalid$(NC)" && false)
+	@kubectl kustomize k8s/monitoring/overlays/dev > /dev/null && echo "$(GREEN)✓ Monitoring manifests valid$(NC)" || (echo "$(YELLOW)✗ Monitoring manifests invalid$(NC)" && false)
 	@kubectl kustomize k8s/apps > /dev/null && echo "$(GREEN)✓ Apps manifests valid$(NC)" || (echo "$(YELLOW)✗ Apps manifests invalid$(NC)" && false)
+
+# Sanity checks
+sanity:
+	@$(SCRIPTS_DIR)/sanity-check.sh
 
 # Clean up credentials
 clean:

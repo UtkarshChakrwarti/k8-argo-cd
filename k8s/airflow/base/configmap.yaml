@@ -38,6 +38,18 @@ data:
     spec:
       serviceAccountName: dev-airflow
       restartPolicy: Never
+      initContainers:
+        - name: git-sync-init
+          image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          args:
+            - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
+            - --ref=main
+            - --one-shot
+            - --link=repo
+            - --root=/git
+          volumeMounts:
+            - name: dags
+              mountPath: /git
       containers:
         - name: airflow-task
           image: apache/airflow:3.0.0-python3.12
@@ -54,8 +66,7 @@ data:
               mountPath: /home/airflow/logs
       volumes:
         - name: dags
-          persistentVolumeClaim:
-            claimName: dev-git-sync-pvc
+          emptyDir: {}
         - name: airflow-logs
           persistentVolumeClaim:
             claimName: dev-logs-local-pvc

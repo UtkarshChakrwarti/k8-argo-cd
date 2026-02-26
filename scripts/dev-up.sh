@@ -81,11 +81,14 @@ EOF
         "apache/airflow:3.0.0-python3.12"
         "registry.k8s.io/git-sync/git-sync:v4.2.3"
     )
+    local tmptar="/tmp/kind-image-load.tar"
     for img in "${images[@]}"; do
         if docker image inspect "$img" &>/dev/null || docker pull "$img" 2>/dev/null; then
-            docker save "$img" | kind load image-archive /dev/stdin --name "$CLUSTER_NAME" 2>/dev/null && \
+            docker save "$img" -o "$tmptar" 2>/dev/null && \
+                kind load image-archive "$tmptar" --name "$CLUSTER_NAME" 2>/dev/null && \
                 log_success "  ${img##*/} loaded" || \
                 log_warning "  ${img##*/} — kind load failed, nodes will pull it"
+            rm -f "$tmptar"
         else
             log_warning "  ${img##*/} — pull failed, nodes will pull it directly"
         fi
@@ -278,9 +281,39 @@ patch_child_apps() {
 
 # ─── Wait for Airflow to be healthy ──────────────────────────────────────────
 wait_for_airflow() {
-    log_info "Waiting for all Airflow deployments (may take 3-5 min)..."
+    local deployments=(
+        "dev-airflow-dag-sync"
+        "dev-airflow-dag-processor"
+        "dev-airflow-scheduler"
+        "dev-airflow-webserver"
+        "dev-airflow-triggerer"
+    )
 
-    # Wait for ALL deployments in parallel with a single kubectl wait
+    # Phase 1: Wait for ArgoCD to create the deployments (up to 120s)
+    log_info "Waiting for ArgoCD to sync Airflow deployments..."
+    local deadline=$((SECONDS + 120))
+    while true; do
+        local all_exist=true
+        for dep in "${deployments[@]}"; do
+            if ! kubectl get deployment "$dep" -n "$AIRFLOW_NAMESPACE" &>/dev/null; then
+                all_exist=false
+                break
+            fi
+        done
+        if $all_exist; then
+            log_success "All Airflow deployments created by ArgoCD"
+            break
+        fi
+        if [ $SECONDS -ge $deadline ]; then
+            log_warning "Timeout waiting for ArgoCD to create deployments"
+            log_warning "Check ArgoCD sync status: argocd app get airflow-app"
+            return 1
+        fi
+        sleep 5
+    done
+
+    # Phase 2: Wait for all deployments to become available
+    log_info "Waiting for Airflow pods to be ready (may take 3-5 min)..."
     if kubectl wait --for=condition=available --timeout=300s \
         deployment/dev-airflow-dag-sync \
         deployment/dev-airflow-dag-processor \

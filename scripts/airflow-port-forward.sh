@@ -28,4 +28,4 @@ log_success "Setting up port-forward to Airflow webserver on port $AIRFLOW_PORT.
 log_info "Access Airflow at: http://localhost:$AIRFLOW_PORT"
 log_info "Press Ctrl+C to stop port-forward"
 
-sudo kubectl port-forward -n "$AIRFLOW_NAMESPACE" svc/dev-airflow-webserver "$AIRFLOW_PORT:8080"
+kubectl port-forward -n "$AIRFLOW_NAMESPACE" svc/dev-airflow-webserver "$AIRFLOW_PORT:8080"

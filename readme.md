@@ -33,8 +33,8 @@ Once the script completes, use the following endpoints:
 
 ## 📋 Common Commands
 
-| Command | Description |
-|---------|-------------|
+| `make argocd-ui` | Open Argo CD UI (auto port-forward) |
+| `make airflow-ui` | Open Airflow UI (auto port-forward) |
 | `make status` | Check the health of all pods and services |
 | `make dev-down` | Tear down the entire cluster and clean up |
 | `make logs` | Stream logs from the Airflow scheduler |

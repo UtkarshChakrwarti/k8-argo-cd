@@ -82,6 +82,9 @@ logs:
 	@echo ""
 	@echo "$(BLUE)=== Airflow Triggerer Logs ===$(NC)"
 	@kubectl logs -n airflow deployment/dev-airflow-triggerer -c triggerer --tail=50 || true
+	@echo ""
+	@echo "$(BLUE)=== Airflow DAG Sync Logs ===$(NC)"
+	@kubectl logs -n airflow deployment/dev-airflow-dag-sync -c git-sync --tail=50 || true
 
 # Validate manifests
 validate:

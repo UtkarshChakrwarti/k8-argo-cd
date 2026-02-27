@@ -101,6 +101,10 @@ start_port_forward() {
     mkdir -p "$PORT_FORWARD_RUNTIME_DIR"
     local pid_file="${PORT_FORWARD_RUNTIME_DIR}/${name}.pid"
     local log_file="${PORT_FORWARD_RUNTIME_DIR}/${name}.log"
+    local session_file="${PORT_FORWARD_RUNTIME_DIR}/${name}.session"
+    local session_name="gitops-pf-${name}"
+    local pf_cmd
+    pf_cmd="kubectl port-forward -n ${namespace} svc/${service} ${local_port}:${remote_port} --address 0.0.0.0"
 
     if [ -f "$pid_file" ]; then
         local old_pid
@@ -110,21 +114,46 @@ start_port_forward() {
         fi
         rm -f "$pid_file"
     fi
+    if [ -f "$session_file" ]; then
+        local old_session
+        old_session="$(cat "$session_file" 2>/dev/null || true)"
+        if [ -n "${old_session}" ] && command -v screen >/dev/null 2>&1; then
+            screen -S "${old_session}" -X quit >/dev/null 2>&1 || true
+        fi
+        rm -f "$session_file"
+    fi
 
     pkill -f "kubectl port-forward -n ${namespace} svc/${service} ${local_port}:${remote_port}" 2>/dev/null || true
     wait_for_service "$namespace" "$service" 120 || return 1
 
-    nohup kubectl port-forward -n "$namespace" "svc/${service}" "${local_port}:${remote_port}" \
-        --address 0.0.0.0 >"$log_file" 2>&1 </dev/null &
-    local pf_pid=$!
-    echo "$pf_pid" > "$pid_file"
-
-    sleep 2
-    if ! kill -0 "$pf_pid" 2>/dev/null; then
-        log_error "Failed to keep port-forward alive for ${name} on localhost:${local_port}"
-        tail -n 20 "$log_file" 2>/dev/null || true
-        return 1
+    : >"$log_file"
+    if command -v screen >/dev/null 2>&1; then
+        screen -S "$session_name" -X quit >/dev/null 2>&1 || true
+        screen -dmS "$session_name" bash -lc "$pf_cmd >> \"$log_file\" 2>&1"
+        echo "$session_name" > "$session_file"
+    else
+        nohup bash -lc "$pf_cmd" >"$log_file" 2>&1 </dev/null &
+        local pf_pid=$!
+        echo "$pf_pid" > "$pid_file"
+        disown "$pf_pid" 2>/dev/null || true
     fi
+
+    local deadline=$((SECONDS + 20))
+    while true; do
+        local active_pid
+        active_pid="$(lsof -nP -t -iTCP:"$local_port" -sTCP:LISTEN 2>/dev/null | head -n 1 || true)"
+        if [ -n "${active_pid}" ]; then
+            echo "$active_pid" > "$pid_file"
+            return 0
+        fi
+        if [ $SECONDS -ge $deadline ]; then
+            log_error "Failed to keep port-forward alive for ${name} on localhost:${local_port}"
+            tail -n 20 "$log_file" 2>/dev/null || true
+            return 1
+        fi
+        sleep 1
+    done
+
     return 0
 }
 
@@ -224,17 +253,40 @@ configure_node_pools() {
     fi
 
     local core_node="${workers[0]}"
-    kubectl label node "$core_node" airflow-node-pool=core --overwrite >/dev/null
-    kubectl taint node "$core_node" dedicated- >/dev/null 2>&1 || true
+    kubectl label node "$core_node" airflow-node-pool=core workload=airflow-core --overwrite >/dev/null
 
     if [ "${#workers[@]}" -ge 2 ]; then
         local user_node="${workers[1]}"
-        kubectl label node "$user_node" airflow-node-pool=user --overwrite >/dev/null
+        kubectl label node "$user_node" airflow-node-pool=user workload=airflow-user --overwrite >/dev/null
+
+        # Ensure old dedicated taints are removed before applying desired values.
+        kubectl taint node "$core_node" dedicated- >/dev/null 2>&1 || true
+        kubectl taint node "$user_node" dedicated- >/dev/null 2>&1 || true
+
+        kubectl taint node "$core_node" dedicated=airflow-core:NoSchedule --overwrite >/dev/null
         kubectl taint node "$user_node" dedicated=airflow-user:NoSchedule --overwrite >/dev/null
-        log_success "Node pool configured: core=${core_node}, user=${user_node} (tainted dedicated=airflow-user:NoSchedule)"
+        log_success "Node pool configured: core=${core_node}, user=${user_node} (taints: dedicated=airflow-core|airflow-user)"
     else
-        log_warning "Only one worker node found (${core_node}); user-task isolation taint could not be configured"
+        log_warning "Only one worker node found (${core_node}); cannot enforce separate airflow-user node pool"
     fi
+}
+
+patch_platform_workloads_for_core_taint() {
+    log_info "Patching platform workloads to tolerate dedicated=airflow-core taint..."
+    local ns
+    for ns in "$ARGOCD_NAMESPACE" ingress-nginx; do
+        if ! kubectl get namespace "$ns" >/dev/null 2>&1; then
+            continue
+        fi
+
+        while IFS= read -r workload; do
+            [ -n "${workload:-}" ] || continue
+            kubectl -n "$ns" patch "$workload" --type merge \
+                -p '{"spec":{"template":{"spec":{"nodeSelector":{"workload":"airflow-core"},"tolerations":[{"key":"dedicated","operator":"Equal","value":"airflow-core","effect":"NoSchedule"}]}}}}' \
+                >/dev/null 2>&1 || true
+        done < <(kubectl -n "$ns" get deployment,statefulset -o name 2>/dev/null || true)
+    done
+    log_success "Platform workload patch complete"
 }
 
 
@@ -640,9 +692,10 @@ main() {
     check_prerequisites     || exit 1
     verify_repo_access      || exit 1
     create_kind_cluster     || exit 1
-    configure_node_pools    || exit 1
     install_ingress_nginx   || exit 1
     install_argocd          || exit 1
+    configure_node_pools    || exit 1
+    patch_platform_workloads_for_core_taint || true
     create_namespaces       || exit 1
     create_mysql_secret     || exit 1
     create_airflow_secret   || exit 1

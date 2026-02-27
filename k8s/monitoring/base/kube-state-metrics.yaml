@@ -57,12 +57,20 @@ spec:
         app: kube-state-metrics
     spec:
       serviceAccountName: kube-state-metrics
+      nodeSelector:
+        workload: airflow-core
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: airflow-core
+          effect: NoSchedule
       containers:
         - name: kube-state-metrics
           image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0
           args:
             - --port=8080
             - --resources=pods,nodes,namespaces,deployments,statefulsets,daemonsets,replicasets,jobs,cronjobs
+            - --metric-labels-allowlist=nodes=[workload,airflow-node-pool]
           ports:
             - name: http-metrics
               containerPort: 8080

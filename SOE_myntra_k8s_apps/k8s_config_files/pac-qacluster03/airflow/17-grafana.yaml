@@ -60,7 +60,7 @@ data:
       "title": "Airflow Platform Command Center",
       "tags": ["airflow", "kubernetes", "business", "engineering"],
       "schemaVersion": 39,
-      "version": 3,
+      "version": 4,
       "refresh": "15s",
       "time": {"from": "now-12h", "to": "now"},
       "panels": [
@@ -399,6 +399,42 @@ data:
             },
             "overrides": []
           }
+        },
+        {
+          "id": 18,
+          "type": "barchart",
+          "title": "Dedicated Node Pools (taints)",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 52},
+          "targets": [
+            {
+              "expr": "sum by (node, value) (kube_node_spec_taint{key=\"dedicated\",effect=\"NoSchedule\"})",
+              "legendFormat": "{{node}} -> {{value}}"
+            }
+          ]
+        },
+        {
+          "id": 19,
+          "type": "barchart",
+          "title": "Running Pods by Node Pool and Namespace",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 52},
+          "targets": [
+            {
+              "expr": "sum by (value, namespace) (kube_pod_info{namespace=~\"airflow-core|airflow-user|mysql\"} * on (node) group_left(value) kube_node_spec_taint{key=\"dedicated\",effect=\"NoSchedule\"})",
+              "legendFormat": "{{value}} / {{namespace}}"
+            }
+          ]
+        },
+        {
+          "id": 20,
+          "type": "barchart",
+          "title": "Node Labels (workload)",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 60},
+          "targets": [
+            {
+              "expr": "sum by (node, label_workload) (kube_node_labels{label_workload=~\"airflow-core|airflow-user\"})",
+              "legendFormat": "{{node}} -> {{label_workload}}"
+            }
+          ]
         }
       ],
       "templating": {
@@ -424,6 +460,13 @@ spec:
       labels:
         app: grafana
     spec:
+      nodeSelector:
+        workload: airflow-core
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: airflow-core
+          effect: NoSchedule
       containers:
         - name: grafana
           image: grafana/grafana:11.1.4

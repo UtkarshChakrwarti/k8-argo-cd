@@ -13,6 +13,13 @@ spec:
       labels:
         app: mysql
     spec:
+      nodeSelector:
+        workload: airflow-core
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: airflow-core
+          effect: NoSchedule
       containers:
         - name: mysql
           image: mysql:8.0

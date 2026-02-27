@@ -9,8 +9,8 @@ A Kubernetes-native Airflow 3.0.0 stack managed with Argo CD (App-of-Apps) on a 
 - Airflow control plane namespace: `airflow-core`
 - Airflow task namespace: `airflow-user` (default for `KubernetesExecutor`)
 - Kind node pools:
-  - `airflow-node-pool=core` (Airflow control-plane + core-routed tasks)
-  - `airflow-node-pool=user` + taint `dedicated=airflow-user:NoSchedule` (default task pods)
+  - `workload=airflow-core` + taint `dedicated=airflow-core:NoSchedule` (Airflow control-plane + core-routed tasks)
+  - `workload=airflow-user` + taint `dedicated=airflow-user:NoSchedule` (default task pods)
 - Database: MySQL (`mysql` namespace)
 - Observability stack in `airflow-core`:
   - kube-state-metrics

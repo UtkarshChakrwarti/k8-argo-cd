@@ -20,7 +20,12 @@ spec:
     spec:
       serviceAccountName: airflow-triggerer
       nodeSelector:
-        airflow-node-pool: core
+        workload: airflow-core
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: airflow-core
+          effect: NoSchedule
       containers:
         - name: triggerer
           image: apache/airflow:3.0.0-python3.12

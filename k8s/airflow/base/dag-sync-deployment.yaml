@@ -23,7 +23,12 @@ spec:
         app: airflow-dag-sync
     spec:
       nodeSelector:
-        airflow-node-pool: core
+        workload: airflow-core
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: airflow-core
+          effect: NoSchedule
       containers:
         - name: git-sync
           image: registry.k8s.io/git-sync/git-sync:v4.2.3

@@ -1,19 +1,49 @@
-"""Airflow logging config: default + Kubernetes pod-log fallback for task logs."""
+"""Minimal Airflow logging config with Kubernetes task-log fallback.
+
+This module intentionally avoids importing ``airflow`` at import time to
+prevent recursive logging-config initialization in Airflow 3.
+"""
 
 from __future__ import annotations
 
-from copy import deepcopy
-from typing import Any
 
-from airflow.config_templates.airflow_local_settings import DEFAULT_LOGGING_CONFIG
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "airflow": {
+            "format": "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "airflow.utils.log.logging_mixin.RedirectStdHandler",
+            "formatter": "airflow",
+            "stream": "sys.stdout",
+        },
+        "task": {
+            "class": "airflow_logging_k8s_handler.KubernetesPodFallbackTaskHandler",
+            "formatter": "airflow",
+            "base_log_folder": "/home/airflow/logs",
+        },
+    },
+    "loggers": {
+        "airflow.task": {
+            "handlers": ["task"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        "flask_appbuilder": {
+            "handlers": ["console"],
+            "level": "WARN",
+            "propagate": True,
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
 
-# Start from Airflow's supported default logging dictionary to avoid config-import
-# recursion during startup. Then only replace the task handler.
-LOGGING_CONFIG: dict[str, Any] = deepcopy(DEFAULT_LOGGING_CONFIG)
-LOGGING_CONFIG["handlers"]["task"]["class"] = (
-    "airflow_logging_k8s_handler.KubernetesPodFallbackTaskHandler"
-)
-
-# Airflow imports this symbol from custom logging modules in some code paths.
-# Keep it nullable so FileTaskHandler does not treat it as a remote logger object.
+# Airflow loads this symbol from the same module.
 REMOTE_TASK_LOG = None

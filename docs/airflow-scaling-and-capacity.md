@@ -41,10 +41,11 @@ Namespace behavior:
 
 Node pool behavior:
 - Default user tasks use pod template `pod_template_user.yaml`:
-  - `nodeSelector: airflow-node-pool=user`
+  - `nodeSelector: workload=airflow-user`
   - toleration `dedicated=airflow-user:NoSchedule`
 - Core-routed tasks use pod template `pod_template_core.yaml`:
-  - `nodeSelector: airflow-node-pool=core`
+  - `nodeSelector: workload=airflow-core`
+  - toleration `dedicated=airflow-core:NoSchedule`
 
 ## 3. Airflow Runtime Throughput Settings
 

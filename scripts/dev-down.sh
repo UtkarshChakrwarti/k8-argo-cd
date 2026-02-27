@@ -20,6 +20,21 @@ log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 main() {
     log_info "Tearing down GitOps POC environment..."
 
+    if command -v screen >/dev/null 2>&1; then
+        log_info "Stopping detached port-forward screen sessions..."
+        local session_names=(
+            "gitops-pf-argocd"
+            "gitops-pf-airflow"
+            "gitops-pf-mysql"
+            "gitops-pf-prometheus"
+            "gitops-pf-grafana"
+        )
+        local session
+        for session in "${session_names[@]}"; do
+            screen -S "$session" -X quit >/dev/null 2>&1 || true
+        done
+    fi
+
     # Kill kubectl port-forwards
     log_info "Stopping port-forwards..."
     pkill -f "kubectl port-forward" 2>/dev/null && log_success "Port-forwards stopped" || \

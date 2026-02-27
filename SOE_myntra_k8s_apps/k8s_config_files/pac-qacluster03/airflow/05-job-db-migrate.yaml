@@ -13,7 +13,12 @@ spec:
       serviceAccountName: airflow-db-migrate
       restartPolicy: OnFailure
       nodeSelector:
-        airflow-node-pool: core
+        workload: airflow-core
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: airflow-core
+          effect: NoSchedule
       initContainers:
         - name: wait-for-mysql
           image: apache/airflow:3.0.0-python3.12

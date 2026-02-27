@@ -17,6 +17,8 @@ MYSQL_NAMESPACE="mysql"
 AIRFLOW_CORE_NAMESPACE="airflow-core"
 AIRFLOW_USER_NAMESPACE="airflow-user"
 MONITORING_NAMESPACE="airflow-core"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PORT_FORWARD_RUNTIME_DIR="${SCRIPT_DIR}/.runtime/port-forward"
 
 # Helper functions
 log_info() {
@@ -63,6 +65,67 @@ check_status() {
         fi
     else
         echo -e "${RED}✗${NC} $label: Not Found"
+    fi
+}
+
+check_http_port_forward() {
+    local label="$1"
+    local port="$2"
+    local url="$3"
+    local insecure="${4:-false}"
+    local listener
+    local http_code
+
+    listener="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | awk 'NR>1 && /kubectl/ {print $2; exit}')"
+    if [ -z "${listener:-}" ]; then
+        echo -e "${RED}✗${NC} $label: No local listener on :$port"
+        return
+    fi
+
+    if [ "$insecure" = "true" ]; then
+        http_code="$(curl -k -sS -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo "000")"
+    else
+        http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo "000")"
+    fi
+
+    if [ "$http_code" = "000" ]; then
+        echo -e "${YELLOW}?${NC} $label: Listener PID ${listener} on :$port, endpoint probe failed"
+    else
+        echo -e "${GREEN}✓${NC} $label: Listener PID ${listener} on :$port (HTTP ${http_code})"
+    fi
+}
+
+check_tcp_port_forward() {
+    local label="$1"
+    local port="$2"
+    local listener
+
+    listener="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | awk 'NR>1 && /kubectl/ {print $2; exit}')"
+    if [ -n "${listener:-}" ]; then
+        echo -e "${GREEN}✓${NC} $label: Listener PID ${listener} on :$port"
+    else
+        echo -e "${RED}✗${NC} $label: No local listener on :$port"
+    fi
+}
+
+check_port_forward_runtime_files() {
+    if [ ! -d "$PORT_FORWARD_RUNTIME_DIR" ]; then
+        return
+    fi
+
+    local stale=0
+    local pid_file
+    for pid_file in "$PORT_FORWARD_RUNTIME_DIR"/*.pid; do
+        [ -e "$pid_file" ] || continue
+        local pid
+        pid="$(cat "$pid_file" 2>/dev/null || true)"
+        if [ -z "${pid:-}" ] || ! kill -0 "$pid" 2>/dev/null; then
+            stale=$((stale + 1))
+        fi
+    done
+
+    if [ "$stale" -gt 0 ]; then
+        echo -e "${YELLOW}?${NC} Runtime notes: ${stale} stale port-forward PID file(s) detected under $PORT_FORWARD_RUNTIME_DIR"
     fi
 }
 
@@ -152,9 +215,23 @@ main() {
     kubectl get svc -n "$MONITORING_NAMESPACE" kube-state-metrics prometheus grafana 2>/dev/null || true
     echo ""
 
+    # Local port-forward status
+    log_section "Local Port Forwards"
+    if command -v lsof >/dev/null 2>&1; then
+        check_http_port_forward "Argo CD UI" "8080" "https://localhost:8080" "true"
+        check_http_port_forward "Airflow UI" "8090" "http://localhost:8090"
+        check_tcp_port_forward "MySQL TCP" "3306"
+        check_http_port_forward "Prometheus UI" "9090" "http://localhost:9090/-/healthy"
+        check_http_port_forward "Grafana UI" "3000" "http://localhost:3000/api/health"
+        check_port_forward_runtime_files
+    else
+        log_info "lsof not found; skipping local listener checks"
+    fi
+    echo ""
+
     # Node status
     log_section "Cluster Nodes"
-    kubectl get nodes -L airflow-node-pool -o wide || echo "No nodes found"
+    kubectl get nodes -L workload,airflow-node-pool -o wide || echo "No nodes found"
     log_info "Node taints:"
     kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints --no-headers 2>/dev/null || true
     echo ""

@@ -89,6 +89,13 @@ spec:
         app: prometheus
     spec:
       serviceAccountName: prometheus
+      nodeSelector:
+        workload: airflow-core
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: airflow-core
+          effect: NoSchedule
       containers:
         - name: prometheus
           image: prom/prometheus:v2.53.0

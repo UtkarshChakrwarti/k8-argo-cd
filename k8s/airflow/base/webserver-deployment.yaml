@@ -49,6 +49,9 @@ spec:
               mountPath: /home/airflow/logs
             - name: dags
               mountPath: /home/airflow/dags
+            - name: custom-logging
+              mountPath: /opt/airflow/custom_logging
+              readOnly: true
             - name: pod-template
               mountPath: /home/airflow/pod_templates
               readOnly: true
@@ -84,6 +87,9 @@ spec:
         - name: dags
           persistentVolumeClaim:
             claimName: dags-pvc
+        - name: custom-logging
+          configMap:
+            name: airflow-custom-logging
         - name: pod-template
           configMap:
             name: airflow-pod-template

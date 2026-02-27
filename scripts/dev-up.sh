@@ -18,7 +18,7 @@ MONITORING_NAMESPACE="airflow-core"
 KIND_CONFIG="/tmp/kind-config.yaml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_URL="https://github.com/UtkarshChakrwarti/k8-argo-cd.git"
-MONITORING_PORT="${MONITORING_PORT:-8091}"
+DAG_REPO_URL="https://github.com/UtkarshChakrwarti/remote_airflow.git"
 PROMETHEUS_PORT="${PROMETHEUS_PORT:-9090}"
 GRAFANA_PORT="${GRAFANA_PORT:-3000}"
 GIT_BIN="/opt/homebrew/bin/git"
@@ -49,12 +49,19 @@ check_prerequisites() {
 
 # ─── Verify GitHub repo is reachable ──────────────────────────────────────────
 verify_repo_access() {
-    log_info "Verifying access to ${REPO_URL}..."
+    log_info "Verifying access to ${REPO_URL} (GitOps repo)..."
     "$GIT_BIN" ls-remote "$REPO_URL" HEAD &>/dev/null || {
         log_error "Cannot reach ${REPO_URL} – check network or repo permissions"
         return 1
     }
-    log_success "Repo accessible: ${REPO_URL}"
+    log_success "GitOps repo accessible: ${REPO_URL}"
+
+    log_info "Verifying access to ${DAG_REPO_URL} (DAG repo)..."
+    "$GIT_BIN" ls-remote "$DAG_REPO_URL" HEAD &>/dev/null || {
+        log_error "Cannot reach ${DAG_REPO_URL} – check network or repo permissions"
+        return 1
+    }
+    log_success "DAG repo accessible: ${DAG_REPO_URL}"
 }
 
 # ─── Kind cluster ─────────────────────────────────────────────────────────────
@@ -330,7 +337,6 @@ patch_child_apps() {
 wait_for_monitoring() {
     log_info "Waiting for monitoring deployments..."
     local deployments=(
-        "kube-ops-view"
         "kube-state-metrics"
         "prometheus"
         "grafana"
@@ -356,7 +362,6 @@ wait_for_monitoring() {
     done
 
     if kubectl wait --for=condition=available --timeout=240s \
-        deployment/kube-ops-view \
         deployment/kube-state-metrics \
         deployment/prometheus \
         deployment/grafana \
@@ -490,16 +495,6 @@ setup_mysql_portforward() {
     log_success "MySQL DB accessible at 127.0.0.1:3306"
 }
 
-# ─── Port-forward Monitoring UI ───────────────────────────────────────────────
-setup_monitoring_portforward() {
-    pkill -f "kubectl port-forward.*kube-ops-view.*${MONITORING_PORT}" 2>/dev/null || true
-    sleep 1
-    log_info "Starting Monitoring UI port-forward on localhost:${MONITORING_PORT}..."
-    kubectl port-forward -n "$MONITORING_NAMESPACE" svc/kube-ops-view "${MONITORING_PORT}:80" \
-        --address 0.0.0.0 >/dev/null 2>&1 &
-    log_success "Monitoring UI available at http://localhost:${MONITORING_PORT}"
-}
-
 # ─── Port-forward Prometheus ─────────────────────────────────────────────────
 setup_prometheus_portforward() {
     pkill -f "kubectl port-forward.*prometheus.*${PROMETHEUS_PORT}" 2>/dev/null || true
@@ -530,19 +525,18 @@ print_summary() {
     echo "  Argo CD UI   →  https://localhost:8080  (see .argocd-credentials.txt)"
     echo "  Airflow UI   →  http://localhost:8090   (see .airflow-credentials.txt)"
     echo "  MySQL DB     →  127.0.0.1:3306          (see .mysql-credentials.txt)"
-    echo "  Monitoring   →  http://localhost:${MONITORING_PORT}"
     echo "  Prometheus   →  http://localhost:${PROMETHEUS_PORT}"
     echo "  Grafana      →  http://localhost:${GRAFANA_PORT} (admin/admin)"
-    echo "  Git repo     →  ${REPO_URL}"
+    echo "  GitOps repo  →  ${REPO_URL}"
+    echo "  DAG repo     →  ${DAG_REPO_URL}"
     echo ""
     echo "  Namespaces:"
     echo "    airflow-core  →  scheduler, webserver, triggerer, dag-processor, git-sync"
     echo "    airflow-user  →  task pods (default KubernetesExecutor target)"
-    echo "    kube-ops-view →  deployed in airflow-core"
     echo "  Demo DAG schedules:"
-    echo "    example_user_namespace  → */5 * * * *"
-    echo "    example_core_namespace  → 2-59/5 * * * *"
-    echo "    example_mixed_namespace → 4-59/5 * * * *"
+    echo "    example_user_namespace  → manual trigger"
+    echo "    example_core_namespace  → manual trigger"
+    echo "    example_mixed_namespace → manual trigger"
     echo ""
     echo "  make status      – component health"
     echo "  make logs        – tail logs"
@@ -570,7 +564,6 @@ main() {
     setup_argocd_portforward  || true
     setup_airflow_portforward || true
     setup_mysql_portforward   || true
-    setup_monitoring_portforward || true
     setup_prometheus_portforward || true
     setup_grafana_portforward || true
     print_summary

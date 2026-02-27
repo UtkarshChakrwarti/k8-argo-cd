@@ -14,7 +14,6 @@ You can use [90-argocd-application-template.yaml](90-argocd-application-template
 
 - `kustomization.yaml`: bundles all manifests in order (Argo CD/Kustomize entrypoint)
 - `01..13`: Airflow multi-namespace control-plane + executor manifests
-- `14-monitoring-kube-ops-view.yaml`: workload topology UI in `airflow-core`
 - `15-kube-state-metrics.yaml`: kube-state-metrics exporter
 - `16-prometheus.yaml`: Prometheus server + config + RBAC
 - `17-grafana.yaml`: Grafana + Prometheus datasource + preloaded pod/resource dashboard
@@ -27,7 +26,7 @@ You can use [90-argocd-application-template.yaml](90-argocd-application-template
 - Node routing:
   - Control-plane pods and core-routed tasks use `nodeSelector: airflow-node-pool=core`
   - Default user tasks use `nodeSelector: airflow-node-pool=user` + toleration `dedicated=airflow-user:NoSchedule`
-- DAG repo sync source is controlled by `DAG_GIT_SYNC_REPO` and `DAG_GIT_SYNC_REF` in `04-configmaps-airflow.yaml`
+- DAG repo sync source is `https://github.com/UtkarshChakrwarti/remote_airflow.git` (`main`) via `DAG_GIT_SYNC_REPO` and `DAG_GIT_SYNC_REF` in `04-configmaps-airflow.yaml`
 - New DAGs are auto-unpaused (`AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False`) so scheduled DAGs start without manual unpause.
 - DAG sync resilience:
   - Continuous sync uses `--link=repo` with atomic switch to new revision.

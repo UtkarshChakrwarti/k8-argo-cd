@@ -27,15 +27,11 @@ check_required_files() {
         "scripts/dev-up.sh"
         "scripts/dev-down.sh"
         "scripts/status.sh"
-        "scripts/monitoring-port-forward.sh"
         "scripts/prometheus-port-forward.sh"
         "scripts/grafana-port-forward.sh"
         "docs/airflow-scaling-and-capacity.md"
-        "dags/example_user_namespace.py"
-        "dags/example_core_namespace.py"
-        "dags/example_mixed_namespace.py"
-        "dags/airflow_logging_config.py"
-        "dags/airflow_logging_k8s_handler.py"
+        "airflow_custom_logging/airflow_logging_config.py"
+        "airflow_custom_logging/airflow_logging_k8s_handler.py"
     )
 
     local missing=()

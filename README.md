@@ -13,7 +13,6 @@ A Kubernetes-native Airflow 3.0.0 stack managed with Argo CD (App-of-Apps) on a 
   - `airflow-node-pool=user` + taint `dedicated=airflow-user:NoSchedule` (default task pods)
 - Database: MySQL (`mysql` namespace)
 - Observability stack in `airflow-core`:
-  - kube-ops-view
   - kube-state-metrics
   - Prometheus
   - Grafana
@@ -30,7 +29,6 @@ This creates the cluster, installs Argo CD, bootstraps applications, and starts 
 
 - Argo CD: `https://localhost:8080` (admin/admin)
 - Airflow: `http://localhost:8090` (admin/admin)
-- Monitoring (pods/nodes/workloads): `http://localhost:8091`
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (admin/admin)
   - Default dashboard: `Airflow Kubernetes Overview`
@@ -50,15 +48,21 @@ Credentials are written to:
 
 ## DAGs Included
 
-- DAG source path for git-sync: `dags/`
+- DAG source repo: `https://github.com/UtkarshChakrwarti/remote_airflow.git` (`main`, path `dags/`)
 - Included examples:
-  - `dags/example_user_namespace.py`: one simple task, prints runtime namespace (`*/5 * * * *`)
-  - `dags/example_core_namespace.py`: one simple task, same print with namespace override (`2-59/5 * * * *`)
-  - `dags/example_mixed_namespace.py`: two-task chain proving both namespace routes (`4-59/5 * * * *`)
+  - `example_user_namespace`: one task, prints runtime namespace (manual trigger)
+  - `example_core_namespace`: one task, same print with namespace override (manual trigger)
+  - `example_mixed_namespace`: two-task chain proving both namespace routes (manual trigger)
 - `make dev-up` also unpauses and triggers all three demo DAGs once so runs appear immediately.
-- DAGs are always pulled from remote Git (`DAG_GIT_SYNC_REPO` + `DAG_GIT_SYNC_REF`), not local mounts.
+- DAGs are always pulled from `remote_airflow` (`DAG_GIT_SYNC_REPO` + `DAG_GIT_SYNC_REF`), not from this repo.
 - Worker pods are retained (`DELETE_WORKER_PODS=False`) to keep Airflow task log links stable.
 - Task log handler uses Kubernetes pod-log fallback, and webserver has cross-namespace RBAC to read task pod logs in both namespaces.
+
+## Repo Roles
+
+- Manifests/GitOps repo used by Argo CD: `https://github.com/UtkarshChakrwarti/k8-argo-cd.git`
+- DAG code repo pulled by git-sync: `https://github.com/UtkarshChakrwarti/remote_airflow.git`
+- `Codespace_PLAY` is local dev workspace; runtime DAG loading does not come from local files.
 
 ## Common Commands
 
@@ -68,7 +72,6 @@ Credentials are written to:
 - `make validate` - validate all kustomize outputs
 - `make argocd-port-forward` - start Argo CD port-forward
 - `make airflow-port-forward` - start Airflow port-forward
-- `make monitoring-port-forward` - start monitoring UI port-forward
 - `make prometheus-port-forward` - start Prometheus port-forward
 - `make grafana-port-forward` - start Grafana port-forward
 - `make dev-down` - tear down everything

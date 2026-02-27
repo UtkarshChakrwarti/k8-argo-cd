@@ -34,6 +34,9 @@ spec:
               mountPath: /home/airflow/logs
             - name: dags
               mountPath: /home/airflow/dags
+            - name: custom-logging
+              mountPath: /opt/airflow/custom_logging
+              readOnly: true
           livenessProbe:
             exec:
               command:
@@ -64,3 +67,6 @@ spec:
         - name: dags
           persistentVolumeClaim:
             claimName: dags-pvc
+        - name: custom-logging
+          configMap:
+            name: airflow-custom-logging

@@ -1,4 +1,4 @@
-.PHONY: help dev-up dev-down status argocd-ui airflow-ui monitoring-ui prometheus-ui grafana-ui logs clean install-prereqs build-dag-sync sanity
+.PHONY: help dev-up dev-down status argocd-ui airflow-ui prometheus-ui grafana-ui logs clean install-prereqs build-dag-sync sanity
 
 # Colors
 BLUE := \033[0;34m
@@ -22,7 +22,6 @@ help:
 	@echo "  make status              - Show status of all components"
 	@echo "  make argocd-ui           - Open Argo CD UI (requires port-forward)"
 	@echo "  make airflow-ui          - Open Airflow UI (requires port-forward)"
-	@echo "  make monitoring-ui       - Open Monitoring UI (requires port-forward)"
 	@echo "  make prometheus-ui       - Open Prometheus UI (requires port-forward)"
 	@echo "  make grafana-ui          - Open Grafana UI (requires port-forward)"
 	@echo "  make logs                - Show logs from all components"
@@ -32,7 +31,6 @@ help:
 	@echo "$(GREEN)Advanced:$(NC)"
 	@echo "  make argocd-port-forward - Manually port-forward Argo CD (8080)"
 	@echo "  make airflow-port-forward - Manually port-forward Airflow (8090)"
-	@echo "  make monitoring-port-forward - Manually port-forward Monitoring (8091)"
 	@echo "  make prometheus-port-forward - Manually port-forward Prometheus (9090)"
 	@echo "  make grafana-port-forward - Manually port-forward Grafana (3000)"
 	@echo "  make validate            - Validate k8s manifests with kustomize"
@@ -61,10 +59,6 @@ argocd-port-forward:
 airflow-port-forward:
 	@$(SCRIPTS_DIR)/airflow-port-forward.sh
 
-# Port-forward Monitoring
-monitoring-port-forward:
-	@$(SCRIPTS_DIR)/monitoring-port-forward.sh
-
 # Port-forward Prometheus
 prometheus-port-forward:
 	@$(SCRIPTS_DIR)/prometheus-port-forward.sh
@@ -84,12 +78,6 @@ airflow-ui: airflow-port-forward
 	@echo "$(GREEN)Opening Airflow UI...$(NC)"
 	@sleep 2
 	@"$$BROWSER" http://localhost:8090 || echo "Please open http://localhost:8090 in your browser"
-
-# Open Monitoring UI
-monitoring-ui: monitoring-port-forward
-	@echo "$(GREEN)Opening Monitoring UI...$(NC)"
-	@sleep 2
-	@"$$BROWSER" http://localhost:8091 || echo "Please open http://localhost:8091 in your browser"
 
 # Open Prometheus UI
 prometheus-ui: prometheus-port-forward
@@ -128,9 +116,6 @@ logs:
 	@echo ""
 	@echo "$(BLUE)=== Airflow User Task Pods ===$(NC)"
 	@kubectl get pods -n airflow-user --show-labels 2>/dev/null || echo "No task pods"
-	@echo ""
-	@echo "$(BLUE)=== Monitoring Logs ===$(NC)"
-	@kubectl logs -n airflow-core deployment/kube-ops-view --tail=50 || true
 	@echo ""
 	@echo "$(BLUE)=== Kube State Metrics Logs ===$(NC)"
 	@kubectl logs -n airflow-core deployment/kube-state-metrics --tail=50 || true

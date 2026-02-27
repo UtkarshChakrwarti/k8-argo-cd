@@ -10,8 +10,6 @@ labels:
     includeSelectors: false
 
 replicas:
-  - name: kube-ops-view
-    count: 1
   - name: kube-state-metrics
     count: 1
   - name: prometheus

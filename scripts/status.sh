@@ -121,14 +121,16 @@ main() {
     local demo_dags=(
         "example_user_namespace"
         "example_core_namespace"
-        "example_mixed_namespace"
     )
     for dag in "${demo_dags[@]}"; do
         echo -e "${CYAN}${dag}${NC}"
-        latest_run=$(kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec deploy/airflow-scheduler -- \
-            airflow dags list-runs "$dag" --no-backfill -o plain 2>/dev/null | awk 'NR==2 {print $2}')
-        latest_state=$(kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec deploy/airflow-scheduler -- \
-            airflow dags list-runs "$dag" --no-backfill -o plain 2>/dev/null | awk 'NR==2 {print $3}')
+        local dag_runs
+        local latest_run
+        local latest_state
+        dag_runs="$(kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec deploy/airflow-scheduler -- \
+            airflow dags list-runs "$dag" --no-backfill -o plain 2>/dev/null || true)"
+        latest_run="$(echo "$dag_runs" | awk 'NR==2 {print $2}')"
+        latest_state="$(echo "$dag_runs" | awk 'NR==2 {print $3}')"
 
         if [ -n "${latest_run:-}" ] && [ -n "${latest_state:-}" ]; then
             echo "  Latest run: $latest_run (state=$latest_state)"

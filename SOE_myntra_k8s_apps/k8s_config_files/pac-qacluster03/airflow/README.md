@@ -27,6 +27,9 @@ You can use [90-argocd-application-template.yaml](90-argocd-application-template
   - Control-plane pods and core-routed tasks use `nodeSelector: airflow-node-pool=core`
   - Default user tasks use `nodeSelector: airflow-node-pool=user` + toleration `dedicated=airflow-user:NoSchedule`
 - DAG repo sync source is `https://github.com/UtkarshChakrwarti/remote_airflow.git` (`main`) via `DAG_GIT_SYNC_REPO` and `DAG_GIT_SYNC_REF` in `04-configmaps-airflow.yaml`
+- DAG authoring helper for namespace routing is available in runtime image path:
+  - `from airflow_namespace_executor import namespace_executor_config`
+  - Set DAG-level `default_args["executor_config"] = namespace_executor_config("airflow-user" | "airflow-core")`
 - New DAGs are auto-unpaused (`AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False`) so scheduled DAGs start without manual unpause.
 - DAG sync resilience:
   - Continuous sync uses `--link=repo` with atomic switch to new revision.

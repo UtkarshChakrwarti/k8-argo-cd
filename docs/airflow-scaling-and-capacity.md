@@ -35,7 +35,9 @@ Default task pod (`airflow-user`) and override template (`airflow-core`) both us
 Namespace behavior:
 - Default task namespace: `airflow-user`
 - Multi-namespace enabled: `airflow-core,airflow-user`
-- DAG-level override available through `executor_config`
+- DAG-level override available through `executor_config` using helper:
+  - `from airflow_namespace_executor import namespace_executor_config`
+  - `default_args["executor_config"] = namespace_executor_config("airflow-core")`
 
 Node pool behavior:
 - Default user tasks use pod template `pod_template_user.yaml`:

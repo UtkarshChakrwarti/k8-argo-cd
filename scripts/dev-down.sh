@@ -10,6 +10,7 @@ NC='\033[0m'
 
 CLUSTER_NAME="gitops-poc"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PORT_FORWARD_RUNTIME_DIR="${SCRIPT_DIR}/.runtime/port-forward"
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -43,6 +44,7 @@ main() {
           "$SCRIPT_DIR/.airflow-credentials.txt" \
           "$SCRIPT_DIR/.argocd-credentials.txt" \
           /tmp/kind-config.yaml
+    rm -rf "$PORT_FORWARD_RUNTIME_DIR"
     log_success "Cleanup complete"
 
     log_success "Environment fully torn down"

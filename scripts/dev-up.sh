@@ -27,11 +27,106 @@ if ! command -v "$GIT_BIN" &>/dev/null; then
 fi
 # Keep GitOps revision explicit to avoid coupling Argo sync to local repo branch name.
 GIT_REVISION="${GIT_REVISION:-feature/multi-namespace-executor}"
+ARGO_APP_WAIT_TIMEOUT_SEC="${ARGO_APP_WAIT_TIMEOUT_SEC:-900}"
+MYSQL_READY_TIMEOUT_SEC="${MYSQL_READY_TIMEOUT_SEC:-600}"
+AIRFLOW_READY_TIMEOUT_SEC="${AIRFLOW_READY_TIMEOUT_SEC:-900}"
+MONITORING_READY_TIMEOUT_SEC="${MONITORING_READY_TIMEOUT_SEC:-300}"
+PORT_FORWARD_RUNTIME_DIR="${SCRIPT_DIR}/.runtime/port-forward"
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+
+wait_for_service() {
+    local namespace="$1"
+    local service="$2"
+    local timeout_sec="$3"
+    local deadline=$((SECONDS + timeout_sec))
+    while true; do
+        if kubectl get service "$service" -n "$namespace" &>/dev/null; then
+            return 0
+        fi
+        if [ $SECONDS -ge $deadline ]; then
+            log_error "Timed out waiting for service ${service} in namespace ${namespace}"
+            return 1
+        fi
+        sleep 2
+    done
+}
+
+wait_for_argocd_app() {
+    local app="$1"
+    local timeout_sec="${2:-$ARGO_APP_WAIT_TIMEOUT_SEC}"
+    local deadline=$((SECONDS + timeout_sec))
+
+    log_info "Waiting for Argo CD app '${app}' to be Synced/Healthy..."
+    while true; do
+        local sync_status
+        local health_status
+        local operation_phase
+        local condition_message
+
+        sync_status="$(kubectl get app "$app" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")"
+        health_status="$(kubectl get app "$app" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")"
+        operation_phase="$(kubectl get app "$app" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.operationState.phase}' 2>/dev/null || true)"
+        condition_message="$(kubectl get app "$app" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.conditions[0].message}' 2>/dev/null || true)"
+
+        if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ] && [ "$operation_phase" != "Running" ]; then
+            log_success "Argo CD app '${app}' is Synced/Healthy"
+            return 0
+        fi
+
+        if [ "$sync_status" = "Unknown" ] && [[ "$condition_message" == *"connection refused"* ]]; then
+            kubectl annotate app -n "$ARGOCD_NAMESPACE" "$app" argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+        fi
+
+        if [ $SECONDS -ge $deadline ]; then
+            log_error "Timed out waiting for Argo CD app '${app}' (sync=${sync_status}, health=${health_status}, op=${operation_phase})"
+            kubectl get app "$app" -n "$ARGOCD_NAMESPACE" -o wide || true
+            kubectl get app "$app" -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.operationState.message}{"\n"}' 2>/dev/null || true
+            return 1
+        fi
+        sleep 5
+    done
+}
+
+start_port_forward() {
+    local name="$1"
+    local namespace="$2"
+    local service="$3"
+    local local_port="$4"
+    local remote_port="$5"
+
+    mkdir -p "$PORT_FORWARD_RUNTIME_DIR"
+    local pid_file="${PORT_FORWARD_RUNTIME_DIR}/${name}.pid"
+    local log_file="${PORT_FORWARD_RUNTIME_DIR}/${name}.log"
+
+    if [ -f "$pid_file" ]; then
+        local old_pid
+        old_pid="$(cat "$pid_file" 2>/dev/null || true)"
+        if [ -n "${old_pid}" ] && kill -0 "${old_pid}" 2>/dev/null; then
+            kill "${old_pid}" 2>/dev/null || true
+        fi
+        rm -f "$pid_file"
+    fi
+
+    pkill -f "kubectl port-forward -n ${namespace} svc/${service} ${local_port}:${remote_port}" 2>/dev/null || true
+    wait_for_service "$namespace" "$service" 120 || return 1
+
+    nohup kubectl port-forward -n "$namespace" "svc/${service}" "${local_port}:${remote_port}" \
+        --address 0.0.0.0 >"$log_file" 2>&1 </dev/null &
+    local pf_pid=$!
+    echo "$pf_pid" > "$pid_file"
+
+    sleep 2
+    if ! kill -0 "$pf_pid" 2>/dev/null; then
+        log_error "Failed to keep port-forward alive for ${name} on localhost:${local_port}"
+        tail -n 20 "$log_file" 2>/dev/null || true
+        return 1
+    fi
+    return 0
+}
 
 # ─── Prerequisites ───────────────────────────────────────────────────────────
 check_prerequisites() {
@@ -334,81 +429,52 @@ patch_child_apps() {
     done
 }
 
+refresh_argocd_apps() {
+    log_info "Forcing Argo CD refresh after app creation/patch..."
+    for app in root-app mysql-app airflow-app monitoring-app; do
+        kubectl annotate app -n "$ARGOCD_NAMESPACE" "$app" argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
+    done
+}
+
+wait_for_mysql_ready() {
+    wait_for_argocd_app "mysql-app" "$ARGO_APP_WAIT_TIMEOUT_SEC" || return 1
+
+    log_info "Waiting for MySQL StatefulSet readiness..."
+    if kubectl wait --for=condition=ready --timeout="${MYSQL_READY_TIMEOUT_SEC}s" \
+        pod/dev-mysql-0 -n "$MYSQL_NAMESPACE" >/dev/null 2>&1; then
+        log_success "MySQL is ready"
+    else
+        log_error "MySQL did not become ready in time"
+        kubectl get pods -n "$MYSQL_NAMESPACE" -o wide || true
+        kubectl get events -n "$MYSQL_NAMESPACE" --sort-by=.lastTimestamp | tail -n 20 || true
+        return 1
+    fi
+}
+
 # ─── Wait for monitoring UI ───────────────────────────────────────────────────
 wait_for_monitoring() {
-    log_info "Waiting for monitoring deployments..."
-    local deployments=(
-        "kube-state-metrics"
-        "prometheus"
-        "grafana"
-    )
-    local deadline=$((SECONDS + 120))
-    while true; do
-        local all_exist=true
-        for dep in "${deployments[@]}"; do
-            if ! kubectl get deployment "$dep" -n "$MONITORING_NAMESPACE" &>/dev/null; then
-                all_exist=false
-                break
-            fi
-        done
-        if $all_exist; then
-            break
-        fi
-        if [ $SECONDS -ge $deadline ]; then
-            log_warning "Timeout waiting for monitoring deployments creation"
-            log_warning "Check ArgoCD sync status: argocd app get monitoring-app"
-            return 1
-        fi
-        sleep 5
-    done
+    wait_for_argocd_app "monitoring-app" "$ARGO_APP_WAIT_TIMEOUT_SEC" || return 1
 
-    if kubectl wait --for=condition=available --timeout=240s \
+    log_info "Waiting for monitoring deployments..."
+    if kubectl wait --for=condition=available --timeout="${MONITORING_READY_TIMEOUT_SEC}s" \
         deployment/kube-state-metrics \
         deployment/prometheus \
         deployment/grafana \
         -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
         log_success "Monitoring stack is ready"
     else
-        log_warning "Monitoring stack is not fully ready yet"
+        log_error "Monitoring stack is not fully ready"
+        kubectl get pods -n "$MONITORING_NAMESPACE" -o wide || true
+        return 1
     fi
 }
 
 # ─── Wait for Airflow to be healthy ──────────────────────────────────────────
 wait_for_airflow() {
-    local deployments=(
-        "airflow-dag-sync"
-        "airflow-dag-processor"
-        "airflow-scheduler"
-        "airflow-webserver"
-        "airflow-triggerer"
-    )
+    wait_for_argocd_app "airflow-app" "$ARGO_APP_WAIT_TIMEOUT_SEC" || return 1
 
-    # Phase 1: Wait for ArgoCD to create the deployments (up to 120s)
-    log_info "Waiting for ArgoCD to sync Airflow deployments..."
-    local deadline=$((SECONDS + 120))
-    while true; do
-        local all_exist=true
-        for dep in "${deployments[@]}"; do
-            if ! kubectl get deployment "$dep" -n "$AIRFLOW_CORE_NAMESPACE" &>/dev/null; then
-                all_exist=false
-                break
-            fi
-        done
-        if $all_exist; then
-            log_success "All Airflow deployments created by ArgoCD"
-            break
-        fi
-        if [ $SECONDS -ge $deadline ]; then
-            log_warning "Timeout waiting for ArgoCD to create deployments"
-            log_warning "Check ArgoCD sync status: argocd app get airflow-app"
-            return 1
-        fi
-        sleep 5
-    done
-
-    # Phase 2: Wait for all deployments to become available
-    log_info "Waiting for Airflow pods to be ready (may take 3-5 min)..."
-    if kubectl wait --for=condition=available --timeout=300s \
+    log_info "Waiting for Airflow pods to be ready (cold pull may take several minutes)..."
+    if kubectl wait --for=condition=available --timeout="${AIRFLOW_READY_TIMEOUT_SEC}s" \
         deployment/airflow-dag-sync \
         deployment/airflow-dag-processor \
         deployment/airflow-scheduler \
@@ -419,7 +485,9 @@ wait_for_airflow() {
         done; then
         log_success "All Airflow components are ready"
     else
-        log_warning "Some deployments not ready — check: kubectl get pods -n $AIRFLOW_CORE_NAMESPACE"
+        log_error "Some Airflow deployments are not ready"
+        kubectl get pods -n "$AIRFLOW_CORE_NAMESPACE" -o wide || true
+        return 1
     fi
 }
 
@@ -428,18 +496,44 @@ bootstrap_demo_dags() {
     local dags=(
         "example_user_namespace"
         "example_core_namespace"
-        "example_mixed_namespace"
     )
     local scheduler_ref="deploy/airflow-scheduler"
     local ts
     ts="$(date +%s)"
 
+    if ! kubectl wait --for=condition=available --timeout=300s deployment/airflow-scheduler -n "$AIRFLOW_CORE_NAMESPACE" >/dev/null 2>&1; then
+        log_warning "Scheduler not ready; skipping demo DAG bootstrap"
+        return 1
+    fi
+
     log_info "Unpausing and bootstrapping demo DAG runs..."
     for dag in "${dags[@]}"; do
+        local dag_visible=false
+        for _ in $(seq 1 30); do
+            if kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec "$scheduler_ref" -- airflow dags list 2>/dev/null | awk '{print $1}' | grep -qx "$dag"; then
+                dag_visible=true
+                break
+            fi
+            sleep 2
+        done
+
+        if ! $dag_visible; then
+            log_warning "  DAG not visible yet, skipping bootstrap: ${dag}"
+            continue
+        fi
+
         if kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec "$scheduler_ref" -- airflow dags unpause "$dag" >/dev/null 2>&1; then
             log_success "  unpaused: ${dag}"
         else
             log_warning "  could not unpause: ${dag}"
+            continue
+        fi
+
+        local existing_run
+        existing_run="$(kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec "$scheduler_ref" -- \
+            airflow dags list-runs "$dag" --no-backfill -o plain 2>/dev/null | awk 'NR==2 {print $2}')"
+        if [ -n "${existing_run:-}" ]; then
+            log_info "  existing run found for ${dag}; skipping bootstrap trigger"
             continue
         fi
 
@@ -451,25 +545,31 @@ bootstrap_demo_dags() {
     done
 }
 
+disable_legacy_mixed_demo_dag() {
+    local scheduler_ref="deploy/airflow-scheduler"
+
+    if kubectl wait --for=condition=available --timeout=180s deployment/airflow-scheduler -n "$AIRFLOW_CORE_NAMESPACE" >/dev/null 2>&1; then
+        if kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec "$scheduler_ref" -- airflow dags list 2>/dev/null | awk '{print $1}' | grep -qx "example_mixed_namespace"; then
+            kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec "$scheduler_ref" -- airflow dags pause example_mixed_namespace >/dev/null 2>&1 || true
+            log_info "Paused legacy demo DAG: example_mixed_namespace"
+        fi
+    fi
+
+    kubectl delete pod -n "$AIRFLOW_CORE_NAMESPACE" -l dag_id=example_mixed_namespace --ignore-not-found >/dev/null 2>&1 || true
+    kubectl delete pod -n "$AIRFLOW_USER_NAMESPACE" -l dag_id=example_mixed_namespace --ignore-not-found >/dev/null 2>&1 || true
+}
+
 # ─── Port-forward Airflow UI ──────────────────────────────────────────────────
 setup_airflow_portforward() {
-    # Kill any stale port-forward
-    pkill -f "kubectl port-forward.*airflow.*8090" 2>/dev/null || true
-    sleep 1
     log_info "Starting Airflow port-forward on localhost:8090..."
-    kubectl port-forward -n "$AIRFLOW_CORE_NAMESPACE" svc/airflow-webserver 8090:8080 \
-        --address 0.0.0.0 >/dev/null 2>&1 &
+    start_port_forward "airflow" "$AIRFLOW_CORE_NAMESPACE" "airflow-webserver" "8090" "8080" || return 1
     log_success "Airflow UI available at http://localhost:8090"
 }
 
 # ─── Port-forward Argo CD ─────────────────────────────────────────────────────
 setup_argocd_portforward() {
-    # Kill any stale port-forward for argocd
-    pkill -f "kubectl port-forward.*argocd-server.*8080" 2>/dev/null || true
-    sleep 1
     log_info "Starting Argo CD port-forward on localhost:8080..."
-    kubectl port-forward -n "$ARGOCD_NAMESPACE" svc/argocd-server 8080:443 \
-        --address 0.0.0.0 >/dev/null 2>&1 &
+    start_port_forward "argocd" "$ARGOCD_NAMESPACE" "argocd-server" "8080" "443" || return 1
     log_success "Argo CD UI available at https://localhost:8080"
 
     cat > "$SCRIPT_DIR/.argocd-credentials.txt" <<EOF
@@ -487,32 +587,22 @@ EOF
 
 # ─── Port-forward MySQL ───────────────────────────────────────────────────────
 setup_mysql_portforward() {
-    # Kill any stale port-forward for mysql
-    pkill -f "kubectl port-forward.*mysql.*3306" 2>/dev/null || true
-    sleep 1
     log_info "Starting MySQL port-forward on localhost:3306..."
-    kubectl port-forward -n "$MYSQL_NAMESPACE" svc/dev-mysql 3306:3306 \
-        --address 0.0.0.0 >/dev/null 2>&1 &
+    start_port_forward "mysql" "$MYSQL_NAMESPACE" "dev-mysql" "3306" "3306" || return 1
     log_success "MySQL DB accessible at 127.0.0.1:3306"
 }
 
 # ─── Port-forward Prometheus ─────────────────────────────────────────────────
 setup_prometheus_portforward() {
-    pkill -f "kubectl port-forward.*prometheus.*${PROMETHEUS_PORT}" 2>/dev/null || true
-    sleep 1
     log_info "Starting Prometheus port-forward on localhost:${PROMETHEUS_PORT}..."
-    kubectl port-forward -n "$MONITORING_NAMESPACE" svc/prometheus "${PROMETHEUS_PORT}:9090" \
-        --address 0.0.0.0 >/dev/null 2>&1 &
+    start_port_forward "prometheus" "$MONITORING_NAMESPACE" "prometheus" "${PROMETHEUS_PORT}" "9090" || return 1
     log_success "Prometheus available at http://localhost:${PROMETHEUS_PORT}"
 }
 
 # ─── Port-forward Grafana ────────────────────────────────────────────────────
 setup_grafana_portforward() {
-    pkill -f "kubectl port-forward.*grafana.*${GRAFANA_PORT}" 2>/dev/null || true
-    sleep 1
     log_info "Starting Grafana port-forward on localhost:${GRAFANA_PORT}..."
-    kubectl port-forward -n "$MONITORING_NAMESPACE" svc/grafana "${GRAFANA_PORT}:3000" \
-        --address 0.0.0.0 >/dev/null 2>&1 &
+    start_port_forward "grafana" "$MONITORING_NAMESPACE" "grafana" "${GRAFANA_PORT}" "3000" || return 1
     log_success "Grafana available at http://localhost:${GRAFANA_PORT} (admin/admin)"
 }
 
@@ -537,7 +627,6 @@ print_summary() {
     echo "  Demo DAG schedules:"
     echo "    example_user_namespace  → manual trigger"
     echo "    example_core_namespace  → manual trigger"
-    echo "    example_mixed_namespace → manual trigger"
     echo ""
     echo "  make status      – component health"
     echo "  make logs        – tail logs"
@@ -559,14 +648,17 @@ main() {
     create_airflow_secret   || exit 1
     bootstrap_argocd        || exit 1
     patch_child_apps        || exit 1
-    wait_for_airflow        || true
+    refresh_argocd_apps     || true
+    wait_for_mysql_ready    || exit 1
+    wait_for_airflow        || exit 1
+    disable_legacy_mixed_demo_dag || true
     bootstrap_demo_dags     || true
-    wait_for_monitoring     || true
-    setup_argocd_portforward  || true
-    setup_airflow_portforward || true
-    setup_mysql_portforward   || true
-    setup_prometheus_portforward || true
-    setup_grafana_portforward || true
+    wait_for_monitoring     || exit 1
+    setup_argocd_portforward  || exit 1
+    setup_airflow_portforward || exit 1
+    setup_mysql_portforward   || exit 1
+    setup_prometheus_portforward || exit 1
+    setup_grafana_portforward || exit 1
     print_summary
 }
 

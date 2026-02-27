@@ -32,6 +32,7 @@ check_required_files() {
         "docs/airflow-scaling-and-capacity.md"
         "airflow_custom_logging/airflow_logging_config.py"
         "airflow_custom_logging/airflow_logging_k8s_handler.py"
+        "airflow_custom_logging/airflow_namespace_executor.py"
     )
 
     local missing=()

@@ -52,11 +52,22 @@ Credentials are written to:
 - Included examples:
   - `example_user_namespace`: one task, prints runtime namespace (manual trigger)
   - `example_core_namespace`: one task, same print with namespace override (manual trigger)
-  - `example_mixed_namespace`: two-task chain proving both namespace routes (manual trigger)
-- `make dev-up` also unpauses and triggers all three demo DAGs once so runs appear immediately.
+- `make dev-up` unpauses both demo DAGs and triggers each only if no prior run exists.
 - DAGs are always pulled from `remote_airflow` (`DAG_GIT_SYNC_REPO` + `DAG_GIT_SYNC_REF`), not from this repo.
 - Worker pods are retained (`DELETE_WORKER_PODS=False`) to keep Airflow task log links stable.
 - Task log handler uses Kubernetes pod-log fallback, and webserver has cross-namespace RBAC to read task pod logs in both namespaces.
+
+Namespace-first DAG authoring (no K8s object boilerplate):
+
+```python
+from airflow_namespace_executor import namespace_executor_config
+
+default_args = {
+    "executor_config": namespace_executor_config("airflow-core"),
+}
+```
+
+Set `executor_config` once in `default_args` so the full DAG runs in that namespace.
 
 ## Repo Roles
 
@@ -79,3 +90,7 @@ Credentials are written to:
 ## Scaling Reference
 
 See [docs/airflow-scaling-and-capacity.md](docs/airflow-scaling-and-capacity.md) for current sizing, executor behavior, and scaling strategy.
+
+## Ops Runbook
+
+See [docs/devops-operations-runbook.md](docs/devops-operations-runbook.md) for full cycle (`make dev-down` / `make dev-up`) behavior, verification checklist, and troubleshooting.

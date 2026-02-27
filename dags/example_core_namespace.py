@@ -22,7 +22,7 @@ CORE_EXECUTOR_CONFIG = {
 with DAG(
     dag_id="example_core_namespace",
     start_date=datetime(2024, 1, 1),
-    schedule=None,
+    schedule="2-59/5 * * * *",
     catchup=False,
     tags=["namespace-demo", "airflow-core"],
     doc_md="""

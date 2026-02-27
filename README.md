@@ -52,9 +52,11 @@ Credentials are written to:
 
 - DAG source path for git-sync: `dags/`
 - Included examples:
-  - `dags/example_user_namespace.py`: default tasks in `airflow-user`
-  - `dags/example_core_namespace.py`: tasks forced to `airflow-core` with `executor_config`
-  - `dags/example_mixed_namespace.py`: one DAG running tasks in both namespaces
+  - `dags/example_user_namespace.py`: default tasks in `airflow-user` (`*/5 * * * *`)
+  - `dags/example_core_namespace.py`: tasks forced to `airflow-core` with `executor_config` (`2-59/5 * * * *`)
+  - `dags/example_mixed_namespace.py`: one DAG running tasks in both namespaces (`4-59/5 * * * *`)
+- `make dev-up` also unpauses and triggers all three demo DAGs once so runs appear immediately.
+- `airflow-user` can look empty between runs because task pods are deleted after success (`DELETE_WORKER_PODS=True`).
 
 ## Common Commands
 

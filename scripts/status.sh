@@ -113,6 +113,30 @@ main() {
     log_section "Airflow Task Pods (namespace: $AIRFLOW_USER_NAMESPACE)"
     log_info "Task Pods:"
     kubectl get pods -n "$AIRFLOW_USER_NAMESPACE" -o wide 2>/dev/null || echo "No task pods running"
+    log_info "Note: airflow-user can be empty because DELETE_WORKER_PODS=True removes succeeded task pods."
+    echo ""
+
+    # Airflow DAG state
+    log_section "Airflow Demo DAGs"
+    local demo_dags=(
+        "example_user_namespace"
+        "example_core_namespace"
+        "example_mixed_namespace"
+    )
+    for dag in "${demo_dags[@]}"; do
+        echo -e "${CYAN}${dag}${NC}"
+        latest_run=$(kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec deploy/airflow-scheduler -- \
+            airflow dags list-runs "$dag" --no-backfill -o plain 2>/dev/null | awk 'NR==2 {print $2}')
+        latest_state=$(kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec deploy/airflow-scheduler -- \
+            airflow dags list-runs "$dag" --no-backfill -o plain 2>/dev/null | awk 'NR==2 {print $3}')
+
+        if [ -n "${latest_run:-}" ] && [ -n "${latest_state:-}" ]; then
+            echo "  Latest run: $latest_run (state=$latest_state)"
+        else
+            echo "  Could not read DAG runs"
+        fi
+        echo ""
+    done
     echo ""
 
     # Monitoring status

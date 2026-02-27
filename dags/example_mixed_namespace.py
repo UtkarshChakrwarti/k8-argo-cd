@@ -21,7 +21,7 @@ CORE_EXECUTOR_CONFIG = {
 with DAG(
     dag_id="example_mixed_namespace",
     start_date=datetime(2024, 1, 1),
-    schedule=None,
+    schedule="4-59/5 * * * *",
     catchup=False,
     tags=["namespace-demo", "mixed"],
 ):

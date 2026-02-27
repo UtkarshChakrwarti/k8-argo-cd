@@ -28,8 +28,10 @@ You can use [90-argocd-application-template.yaml](90-argocd-application-template
   - Control-plane pods and core-routed tasks use `nodeSelector: airflow-node-pool=core`
   - Default user tasks use `nodeSelector: airflow-node-pool=user` + toleration `dedicated=airflow-user:NoSchedule`
 - DAG repo sync source is controlled by `DAG_GIT_SYNC_REPO` and `DAG_GIT_SYNC_REF` in `04-configmaps-airflow.yaml`
+- New DAGs are auto-unpaused (`AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False`) so scheduled DAGs start without manual unpause.
 - DAG sync resilience:
   - Continuous sync uses `--link=repo` with atomic switch to new revision.
   - If pull/fetch fails, old DAG files stay in place (last-good revision is preserved).
   - `--max-failures=-1` keeps retrying forever.
   - `--stale-worktree-timeout=5m` cleans stale temporary worktrees.
+- Default behavior deletes succeeded task pods quickly (`DELETE_WORKER_PODS=True`), so `airflow-user` may appear empty between runs.

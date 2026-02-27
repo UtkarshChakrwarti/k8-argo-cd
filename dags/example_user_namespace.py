@@ -13,7 +13,7 @@ from airflow.operators.bash import BashOperator
 with DAG(
     dag_id="example_user_namespace",
     start_date=datetime(2024, 1, 1),
-    schedule=None,
+    schedule="*/5 * * * *",
     catchup=False,
     tags=["namespace-demo", "airflow-user"],
     doc_md="""

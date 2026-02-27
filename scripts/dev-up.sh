@@ -417,6 +417,34 @@ wait_for_airflow() {
     fi
 }
 
+# ─── Ensure demo DAGs are active and visible ─────────────────────────────────
+bootstrap_demo_dags() {
+    local dags=(
+        "example_user_namespace"
+        "example_core_namespace"
+        "example_mixed_namespace"
+    )
+    local scheduler_ref="deploy/airflow-scheduler"
+    local ts
+    ts="$(date +%s)"
+
+    log_info "Unpausing and bootstrapping demo DAG runs..."
+    for dag in "${dags[@]}"; do
+        if kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec "$scheduler_ref" -- airflow dags unpause "$dag" >/dev/null 2>&1; then
+            log_success "  unpaused: ${dag}"
+        else
+            log_warning "  could not unpause: ${dag}"
+            continue
+        fi
+
+        if kubectl -n "$AIRFLOW_CORE_NAMESPACE" exec "$scheduler_ref" -- airflow dags trigger "$dag" -r "bootstrap_${dag}_${ts}" >/dev/null 2>&1; then
+            log_success "  triggered: ${dag}"
+        else
+            log_warning "  could not trigger: ${dag}"
+        fi
+    done
+}
+
 # ─── Port-forward Airflow UI ──────────────────────────────────────────────────
 setup_airflow_portforward() {
     # Kill any stale port-forward
@@ -511,6 +539,10 @@ print_summary() {
     echo "    airflow-core  →  scheduler, webserver, triggerer, dag-processor, git-sync"
     echo "    airflow-user  →  task pods (default KubernetesExecutor target)"
     echo "    kube-ops-view →  deployed in airflow-core"
+    echo "  Demo DAG schedules:"
+    echo "    example_user_namespace  → */5 * * * *"
+    echo "    example_core_namespace  → 2-59/5 * * * *"
+    echo "    example_mixed_namespace → 4-59/5 * * * *"
     echo ""
     echo "  make status      – component health"
     echo "  make logs        – tail logs"
@@ -533,6 +565,7 @@ main() {
     bootstrap_argocd        || exit 1
     patch_child_apps        || exit 1
     wait_for_airflow        || true
+    bootstrap_demo_dags     || true
     wait_for_monitoring     || true
     setup_argocd_portforward  || true
     setup_airflow_portforward || true

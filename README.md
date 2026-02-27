@@ -58,7 +58,7 @@ Credentials are written to:
 - `make dev-up` also unpauses and triggers all three demo DAGs once so runs appear immediately.
 - DAGs are always pulled from remote Git (`DAG_GIT_SYNC_REPO` + `DAG_GIT_SYNC_REF`), not local mounts.
 - Worker pods are retained (`DELETE_WORKER_PODS=False`) to keep Airflow task log links stable.
-- Task log handler uses Kubernetes pod-log fallback, so Airflow UI can read logs across both namespaces.
+- Task log handler uses Kubernetes pod-log fallback, and webserver has cross-namespace RBAC to read task pod logs in both namespaces.
 
 ## Common Commands
 

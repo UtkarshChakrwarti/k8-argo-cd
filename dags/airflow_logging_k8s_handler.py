@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
-from airflow.configuration import conf
 from airflow.utils.log.file_task_handler import FileTaskHandler
 from kubernetes import client as k8s_client
 from kubernetes import config as k8s_config
+from kubernetes.config.config_exception import ConfigException
 
 
 class KubernetesPodFallbackTaskHandler(FileTaskHandler):
@@ -18,7 +19,10 @@ class KubernetesPodFallbackTaskHandler(FileTaskHandler):
     @classmethod
     def _get_core_v1(cls) -> k8s_client.CoreV1Api:
         if cls._core_v1 is None:
-            k8s_config.load_incluster_config()
+            try:
+                k8s_config.load_incluster_config()
+            except ConfigException:
+                k8s_config.load_kube_config()
             cls._core_v1 = k8s_client.CoreV1Api()
         return cls._core_v1
 
@@ -38,13 +42,12 @@ class KubernetesPodFallbackTaskHandler(FileTaskHandler):
         explicit_ns = cls._namespace_from_executor_config(ti)
         if explicit_ns:
             namespaces.append(explicit_ns)
-        default_ns = conf.get("kubernetes_executor", "namespace", fallback="airflow-user")
+        default_ns = os.getenv("AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE", "airflow-user")
         if default_ns:
             namespaces.append(default_ns)
-        multi_ns = conf.get(
-            "kubernetes_executor",
-            "multi_namespace_mode_namespace_list",
-            fallback="",
+        multi_ns = os.getenv(
+            "AIRFLOW__KUBERNETES_EXECUTOR__MULTI_NAMESPACE_MODE_NAMESPACE_LIST",
+            "",
         )
         namespaces.extend(ns.strip() for ns in multi_ns.split(",") if ns.strip())
         return list(dict.fromkeys(namespaces))
@@ -54,7 +57,10 @@ class KubernetesPodFallbackTaskHandler(FileTaskHandler):
         if not pod_name:
             return [], []
 
-        api = self._get_core_v1()
+        try:
+            api = self._get_core_v1()
+        except Exception as exc:  # noqa: BLE001
+            return [f"Could not initialize Kubernetes API client: {exc}"], []
         namespaces = self._candidate_namespaces(ti)
         last_error: Exception | None = None
 

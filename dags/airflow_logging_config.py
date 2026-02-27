@@ -15,4 +15,5 @@ LOGGING_CONFIG["handlers"]["task"]["class"] = (
 )
 
 # Airflow imports this symbol from custom logging modules in some code paths.
-REMOTE_TASK_LOG = LOGGING_CONFIG["handlers"].get("task")
+# Keep it nullable so FileTaskHandler does not treat it as a remote logger object.
+REMOTE_TASK_LOG = None

@@ -113,7 +113,7 @@ main() {
     log_section "Airflow Task Pods (namespace: $AIRFLOW_USER_NAMESPACE)"
     log_info "Task Pods:"
     kubectl get pods -n "$AIRFLOW_USER_NAMESPACE" -o wide 2>/dev/null || echo "No task pods running"
-    log_info "Note: airflow-user can be empty because DELETE_WORKER_PODS=True removes succeeded task pods."
+    log_info "Task pods are retained (DELETE_WORKER_PODS=False) so Airflow UI log links remain available."
     echo ""
 
     # Airflow DAG state

@@ -60,57 +60,90 @@ data:
       "title": "Airflow Kubernetes Overview",
       "tags": ["airflow", "kubernetes"],
       "schemaVersion": 39,
-      "version": 1,
+      "version": 2,
       "refresh": "15s",
       "panels": [
         {
           "id": 1,
           "type": "timeseries",
-          "title": "Running Pods by Namespace",
+          "title": "Airflow Component Ready (0/1)",
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
-          "targets": [{"expr": "sum(kube_pod_status_phase{phase=\"Running\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
+          "targets": [{
+            "expr": "max by (pod) (kube_pod_status_ready{namespace=\"airflow-core\",condition=\"true\",pod=~\"airflow-(scheduler|triggerer|webserver|dag-processor|dag-sync).*\"})",
+            "legendFormat": "{{pod}}"
+          }]
         },
         {
           "id": 2,
           "type": "timeseries",
-          "title": "Total Pods by Namespace",
+          "title": "Airflow Component Restarts (1h)",
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-          "targets": [{"expr": "count(kube_pod_info) by (namespace)", "legendFormat": "{{namespace}}"}]
+          "targets": [{
+            "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"airflow-core\",pod=~\"airflow-(scheduler|triggerer|webserver|dag-processor|dag-sync).*\"}[1h]))",
+            "legendFormat": "{{pod}}"
+          }]
         },
         {
           "id": 3,
           "type": "timeseries",
-          "title": "CPU Usage (cores) Top Pods",
+          "title": "Airflow Component CPU % of Limit",
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-          "targets": [{"expr": "topk(20, sum(rate(container_cpu_usage_seconds_total{container!=\"\",container!=\"POD\"}[5m])) by (namespace,pod))", "legendFormat": "{{namespace}}/{{pod}}"}]
+          "targets": [{
+            "expr": "100 * sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"airflow-core\",pod=~\"airflow-(scheduler|triggerer|webserver|dag-processor|dag-sync).*\",container!=\"\",container!=\"POD\"}[5m])) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{namespace=\"airflow-core\",pod=~\"airflow-(scheduler|triggerer|webserver|dag-processor|dag-sync).*\",resource=\"cpu\",unit=\"core\"}), 0.001)",
+            "legendFormat": "{{pod}}"
+          }]
         },
         {
           "id": 4,
           "type": "timeseries",
-          "title": "Memory Working Set Top Pods",
+          "title": "Airflow Component Memory % of Limit",
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-          "targets": [{"expr": "topk(20, sum(container_memory_working_set_bytes{container!=\"\",container!=\"POD\"}) by (namespace,pod))", "legendFormat": "{{namespace}}/{{pod}}"}]
+          "targets": [{
+            "expr": "100 * sum by (pod) (container_memory_working_set_bytes{namespace=\"airflow-core\",pod=~\"airflow-(scheduler|triggerer|webserver|dag-processor|dag-sync).*\",container!=\"\",container!=\"POD\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{namespace=\"airflow-core\",pod=~\"airflow-(scheduler|triggerer|webserver|dag-processor|dag-sync).*\",resource=\"memory\",unit=\"byte\"}), 1)",
+            "legendFormat": "{{pod}}"
+          }]
         },
         {
           "id": 5,
           "type": "timeseries",
-          "title": "CPU Requests by Namespace",
+          "title": "Running Pods by Namespace",
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
-          "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\",unit=\"core\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
+          "targets": [{"expr": "sum(kube_pod_status_phase{phase=\"Running\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
         },
         {
           "id": 6,
           "type": "timeseries",
-          "title": "Memory Requests by Namespace",
+          "title": "Total Pods by Namespace",
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
-          "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"memory\",unit=\"byte\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
+          "targets": [{"expr": "count(kube_pod_info) by (namespace)", "legendFormat": "{{namespace}}"}]
         },
         {
           "id": 7,
           "type": "timeseries",
-          "title": "Container Restarts (1h increase)",
+          "title": "CPU Usage (cores) Top Pods",
           "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
-          "targets": [{"expr": "topk(20, increase(kube_pod_container_status_restarts_total[1h]))", "legendFormat": "{{namespace}}/{{pod}}/{{container}}"}]
+          "targets": [{"expr": "topk(20, sum(rate(container_cpu_usage_seconds_total{container!=\"\",container!=\"POD\"}[5m])) by (namespace,pod))", "legendFormat": "{{namespace}}/{{pod}}"}]
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Memory Working Set Top Pods",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+          "targets": [{"expr": "topk(20, sum(container_memory_working_set_bytes{container!=\"\",container!=\"POD\"}) by (namespace,pod))", "legendFormat": "{{namespace}}/{{pod}}"}]
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "CPU Requests by Namespace",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+          "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\",unit=\"core\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "Memory Requests by Namespace",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+          "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"memory\",unit=\"byte\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
         }
       ],
       "templating": {"list": []},

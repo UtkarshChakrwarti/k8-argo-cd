@@ -1,10 +1,4 @@
-"""
-Example DAG: Tasks run in airflow-core namespace via executor_config override.
-
-Uses pod_override in executor_config to explicitly target the airflow-core
-namespace instead of the default airflow-user namespace. This requires
-multi_namespace_mode=True in the KubernetesExecutor config.
-"""
+"""Namespace override demo DAG (airflow-core)."""
 
 from datetime import datetime
 
@@ -12,8 +6,7 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from kubernetes.client import models as k8s
 
-CORE_EXECUTOR_CONFIG = {
-    "pod_template_file": "/home/airflow/pod_templates/pod_template_core.yaml",
+CORE_NAMESPACE_EXECUTOR_CONFIG = {
     "pod_override": k8s.V1Pod(
         metadata=k8s.V1ObjectMeta(namespace="airflow-core"),
     ),
@@ -25,39 +18,13 @@ with DAG(
     schedule="2-59/5 * * * *",
     catchup=False,
     tags=["namespace-demo", "airflow-core"],
-    doc_md="""
-    ## Namespace Demo: airflow-core
-
-    This DAG demonstrates tasks running in the **airflow-core** namespace
-    by using `executor_config` with `pod_override` to set the namespace.
-    Requires `multi_namespace_mode=True` in KubernetesExecutor configuration.
-    """,
 ):
-    verify_namespace = BashOperator(
-        task_id="verify_namespace",
+    BashOperator(
+        task_id="print_namespace",
         bash_command=(
-            "echo '=== Task Pod Namespace Info ===' && "
-            "NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace) && "
-            "echo \"Running in namespace: $NAMESPACE\" && "
-            "echo \"Hostname: $(hostname)\" && "
-            "echo \"Date: $(date)\" && "
-            "if [ \"$NAMESPACE\" = 'airflow-core' ]; then "
-            "  echo 'PASS: Correctly running in airflow-core namespace'; "
-            "else "
-            "  echo \"WARN: Expected airflow-core but got $NAMESPACE\"; "
-            "fi"
+            "NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace) && "
+            "echo \"DAG=example_core_namespace task=print_namespace namespace=$NS host=$(hostname)\" && "
+            "date"
         ),
-        executor_config=CORE_EXECUTOR_CONFIG,
+        executor_config=CORE_NAMESPACE_EXECUTOR_CONFIG,
     )
-
-    run_task = BashOperator(
-        task_id="run_sample_task",
-        bash_command=(
-            "echo 'Executing sample workload in airflow-core namespace...' && "
-            "python3 -c \"import sys; print(f'Python {sys.version}')\" && "
-            "echo 'Task completed successfully'"
-        ),
-        executor_config=CORE_EXECUTOR_CONFIG,
-    )
-
-    verify_namespace >> run_task

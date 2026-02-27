@@ -34,4 +34,4 @@ You can use [90-argocd-application-template.yaml](90-argocd-application-template
   - If pull/fetch fails, old DAG files stay in place (last-good revision is preserved).
   - `--max-failures=-1` keeps retrying forever.
   - `--stale-worktree-timeout=5m` cleans stale temporary worktrees.
-- Default behavior deletes succeeded task pods quickly (`DELETE_WORKER_PODS=True`), so `airflow-user` may appear empty between runs.
+- Worker pods are retained (`DELETE_WORKER_PODS=False`) to keep Airflow task log links stable.

@@ -23,7 +23,7 @@ spec:
       containers:
         - name: scheduler
           image: apache/airflow:3.0.0-python3.12
-          command: ["airflow", "scheduler", "--skip-serve-logs"]
+          command: ["airflow", "scheduler"]
           envFrom:
             - configMapRef:
                 name: airflow-config

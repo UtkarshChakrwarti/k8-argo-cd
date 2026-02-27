@@ -31,6 +31,9 @@ check_required_files() {
         "scripts/prometheus-port-forward.sh"
         "scripts/grafana-port-forward.sh"
         "docs/airflow-scaling-and-capacity.md"
+        "dags/example_user_namespace.py"
+        "dags/example_core_namespace.py"
+        "dags/example_mixed_namespace.py"
     )
 
     local missing=()

@@ -129,7 +129,9 @@ main() {
 
     # Node status
     log_section "Cluster Nodes"
-    kubectl get nodes -o wide || echo "No nodes found"
+    kubectl get nodes -L airflow-node-pool -o wide || echo "No nodes found"
+    log_info "Node taints:"
+    kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints --no-headers 2>/dev/null || true
     echo ""
 
     # Ingress status

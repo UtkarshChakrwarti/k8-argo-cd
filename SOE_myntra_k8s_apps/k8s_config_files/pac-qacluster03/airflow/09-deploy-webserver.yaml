@@ -18,6 +18,8 @@ spec:
         app: airflow-webserver
     spec:
       serviceAccountName: airflow-webserver
+      nodeSelector:
+        airflow-node-pool: core
       containers:
         - name: webserver
           image: apache/airflow:3.0.0-python3.12

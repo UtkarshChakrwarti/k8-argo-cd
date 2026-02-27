@@ -37,6 +37,13 @@ Namespace behavior:
 - Multi-namespace enabled: `airflow-core,airflow-user`
 - DAG-level override available through `executor_config`
 
+Node pool behavior:
+- Default user tasks use pod template `pod_template_user.yaml`:
+  - `nodeSelector: airflow-node-pool=user`
+  - toleration `dedicated=airflow-user:NoSchedule`
+- Core-routed tasks use pod template `pod_template_core.yaml`:
+  - `nodeSelector: airflow-node-pool=core`
+
 ## 3. Airflow Runtime Throughput Settings
 
 Source: `k8s/airflow/base/configmap.yaml`
@@ -88,3 +95,17 @@ Recommended trigger points:
 - Monitoring UI (pods/workloads): `http://localhost:8091`
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (admin/admin)
+- Grafana default dashboard: `Airflow Kubernetes Overview`
+
+## 8. DAG Sync Source and Failure Behavior
+
+Source:
+- DAG repo URL: `DAG_GIT_SYNC_REPO` (in `k8s/airflow/base/configmap.yaml`)
+- DAG repo ref/branch/tag: `DAG_GIT_SYNC_REF`
+- DAG path inside repo: `/dags`
+
+Failure behavior:
+- `--max-failures=-1` retries forever.
+- `--link=repo` keeps serving last-good revision atomically.
+- `--stale-worktree-timeout=5m` prunes stale temporary worktrees.
+- `--sync-timeout=2m` bounds each sync attempt.

@@ -17,7 +17,7 @@ AIRFLOW_USER_NAMESPACE="airflow-user"
 MONITORING_NAMESPACE="airflow-core"
 KIND_CONFIG="/tmp/kind-config.yaml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_URL="https://github.com/UtkarshChakrwarti/k8-argo-cd.git"
+REPO_URL="https://github.com/UtkarshChakrwarti/Codespace_PLAY.git"
 MONITORING_PORT="${MONITORING_PORT:-8091}"
 PROMETHEUS_PORT="${PROMETHEUS_PORT:-9090}"
 GRAFANA_PORT="${GRAFANA_PORT:-3000}"
@@ -80,6 +80,7 @@ nodes:
         hostPort: 443
         protocol: TCP
   - role: worker
+  - role: worker
 EOF
     kind create cluster --config "$KIND_CONFIG" || { log_error "Failed to create cluster"; return 1; }
     kubectl cluster-info --context "kind-${CLUSTER_NAME}" >/dev/null 2>&1
@@ -103,6 +104,30 @@ EOF
             log_warning "  ${img##*/} — pull failed, nodes will pull it directly"
         fi
     done
+}
+
+# ─── Node Pools / Taints ─────────────────────────────────────────────────────
+configure_node_pools() {
+    log_info "Configuring node pools for Airflow (core/user)..."
+
+    mapfile -t workers < <(kubectl get nodes -o name | sed 's|node/||' | rg 'worker' | sort)
+    if [ "${#workers[@]}" -eq 0 ]; then
+        log_error "No worker nodes found to label/taint"
+        return 1
+    fi
+
+    local core_node="${workers[0]}"
+    kubectl label node "$core_node" airflow-node-pool=core --overwrite >/dev/null
+    kubectl taint node "$core_node" dedicated- >/dev/null 2>&1 || true
+
+    if [ "${#workers[@]}" -ge 2 ]; then
+        local user_node="${workers[1]}"
+        kubectl label node "$user_node" airflow-node-pool=user --overwrite >/dev/null
+        kubectl taint node "$user_node" dedicated=airflow-user:NoSchedule --overwrite >/dev/null
+        log_success "Node pool configured: core=${core_node}, user=${user_node} (tainted dedicated=airflow-user:NoSchedule)"
+    else
+        log_warning "Only one worker node found (${core_node}); user-task isolation taint could not be configured"
+    fi
 }
 
 
@@ -495,6 +520,7 @@ main() {
     check_prerequisites     || exit 1
     verify_repo_access      || exit 1
     create_kind_cluster     || exit 1
+    configure_node_pools    || exit 1
     install_ingress_nginx   || exit 1
     install_argocd          || exit 1
     create_namespaces       || exit 1

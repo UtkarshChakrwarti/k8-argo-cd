@@ -27,6 +27,96 @@ data:
         url: http://prometheus.airflow-core.svc.cluster.local:9090
         isDefault: true
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  name: grafana-dashboard-provider
+  namespace: airflow-core
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: airflow-k8s
+        orgId: 1
+        folder: Airflow-K8s
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  name: grafana-dashboard-k8s
+  namespace: airflow-core
+data:
+  airflow-k8s-overview.json: |
+    {
+      "title": "Airflow Kubernetes Overview",
+      "tags": ["airflow", "kubernetes"],
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "15s",
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Running Pods by Namespace",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "targets": [{"expr": "sum(kube_pod_status_phase{phase=\"Running\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Total Pods by Namespace",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "targets": [{"expr": "count(kube_pod_info) by (namespace)", "legendFormat": "{{namespace}}"}]
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "CPU Usage (cores) Top Pods",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "targets": [{"expr": "topk(20, sum(rate(container_cpu_usage_seconds_total{container!=\"\",container!=\"POD\"}[5m])) by (namespace,pod))", "legendFormat": "{{namespace}}/{{pod}}"}]
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Memory Working Set Top Pods",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "targets": [{"expr": "topk(20, sum(container_memory_working_set_bytes{container!=\"\",container!=\"POD\"}) by (namespace,pod))", "legendFormat": "{{namespace}}/{{pod}}"}]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "CPU Requests by Namespace",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\",unit=\"core\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Memory Requests by Namespace",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "targets": [{"expr": "sum(kube_pod_container_resource_requests{resource=\"memory\",unit=\"byte\"}) by (namespace)", "legendFormat": "{{namespace}}"}]
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Container Restarts (1h increase)",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+          "targets": [{"expr": "topk(20, increase(kube_pod_container_status_restarts_total[1h]))", "legendFormat": "{{namespace}}/{{pod}}/{{container}}"}]
+        }
+      ],
+      "templating": {"list": []},
+      "time": {"from": "now-6h", "to": "now"}
+    }
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -61,9 +151,15 @@ spec:
                 secretKeyRef:
                   name: grafana-admin
                   key: admin-password
+            - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
+              value: /var/lib/grafana/dashboards/airflow-k8s-overview.json
           volumeMounts:
             - name: datasources
               mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
           resources:
             requests:
               cpu: 100m
@@ -87,6 +183,12 @@ spec:
         - name: datasources
           configMap:
             name: grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboards
+          configMap:
+            name: grafana-dashboard-k8s
 ---
 apiVersion: v1
 kind: Service

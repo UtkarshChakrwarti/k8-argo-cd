@@ -46,5 +46,3 @@ npm-debug.log
 # Build artifacts
 dist/
 build/
-# Airflow Sync
-dags/

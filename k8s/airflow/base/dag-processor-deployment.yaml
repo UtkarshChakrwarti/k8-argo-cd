@@ -18,6 +18,8 @@ spec:
         app: airflow-dag-processor
     spec:
       serviceAccountName: airflow-scheduler
+      nodeSelector:
+        airflow-node-pool: core
       containers:
         - name: dag-processor
           image: apache/airflow:3.0.0-python3.12

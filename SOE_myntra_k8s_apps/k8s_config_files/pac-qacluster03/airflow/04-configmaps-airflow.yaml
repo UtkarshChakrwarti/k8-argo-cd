@@ -19,6 +19,8 @@ data:
   # DAGs
   AIRFLOW__CORE__DAGS_FOLDER: /home/airflow/dags/repo/dags
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  DAG_GIT_SYNC_REPO: https://github.com/UtkarshChakrwarti/Codespace_PLAY.git
+  DAG_GIT_SYNC_REF: feature/multi-namespace-executor
   # Execution API (Airflow 3)
   AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver.airflow-core.svc.cluster.local:8080/execution/"
   # Logging
@@ -63,6 +65,13 @@ data:
     spec:
       serviceAccountName: airflow-task-sa
       restartPolicy: Never
+      nodeSelector:
+        airflow-node-pool: user
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: airflow-user
+          effect: NoSchedule
       securityContext:
         runAsUser: 50000
         runAsGroup: 50000
@@ -70,9 +79,20 @@ data:
       initContainers:
         - name: git-sync-init
           image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          env:
+            - name: GIT_SYNC_REPO
+              valueFrom:
+                configMapKeyRef:
+                  name: airflow-config
+                  key: DAG_GIT_SYNC_REPO
+            - name: GIT_SYNC_REF
+              valueFrom:
+                configMapKeyRef:
+                  name: airflow-config
+                  key: DAG_GIT_SYNC_REF
           args:
-            - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
-            - --ref=main
+            - --repo=$(GIT_SYNC_REPO)
+            - --ref=$(GIT_SYNC_REF)
             - --one-time
             - --max-failures=-1
             - --sync-timeout=2m
@@ -132,6 +152,8 @@ data:
     spec:
       serviceAccountName: airflow-task-sa
       restartPolicy: Never
+      nodeSelector:
+        airflow-node-pool: core
       securityContext:
         runAsUser: 50000
         runAsGroup: 50000
@@ -139,9 +161,20 @@ data:
       initContainers:
         - name: git-sync-init
           image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          env:
+            - name: GIT_SYNC_REPO
+              valueFrom:
+                configMapKeyRef:
+                  name: airflow-config
+                  key: DAG_GIT_SYNC_REPO
+            - name: GIT_SYNC_REF
+              valueFrom:
+                configMapKeyRef:
+                  name: airflow-config
+                  key: DAG_GIT_SYNC_REF
           args:
-            - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
-            - --ref=main
+            - --repo=$(GIT_SYNC_REPO)
+            - --ref=$(GIT_SYNC_REF)
             - --one-time
             - --max-failures=-1
             - --sync-timeout=2m

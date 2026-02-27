@@ -8,6 +8,9 @@ A Kubernetes-native Airflow 3.0.0 stack managed with Argo CD (App-of-Apps) on a 
 - GitOps: Argo CD (`root-app` + child apps)
 - Airflow control plane namespace: `airflow-core`
 - Airflow task namespace: `airflow-user` (default for `KubernetesExecutor`)
+- Kind node pools:
+  - `airflow-node-pool=core` (Airflow control-plane + core-routed tasks)
+  - `airflow-node-pool=user` + taint `dedicated=airflow-user:NoSchedule` (default task pods)
 - Database: MySQL (`mysql` namespace)
 - Observability stack in `airflow-core`:
   - kube-ops-view
@@ -30,6 +33,7 @@ This creates the cluster, installs Argo CD, bootstraps applications, and starts 
 - Monitoring (pods/nodes/workloads): `http://localhost:8091`
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (admin/admin)
+  - Default dashboard: `Airflow Kubernetes Overview`
 - MySQL: `127.0.0.1:3306`
 
 Credentials are written to:
@@ -43,6 +47,14 @@ Credentials are written to:
   - scheduler, webserver, triggerer, dag-processor, dag-sync
 - Task pods run in `airflow-user` by default.
 - DAGs can override task namespace via `executor_config` and switch to `airflow-core` when needed.
+
+## DAGs Included
+
+- DAG source path for git-sync: `dags/`
+- Included examples:
+  - `dags/example_user_namespace.py`: default tasks in `airflow-user`
+  - `dags/example_core_namespace.py`: tasks forced to `airflow-core` with `executor_config`
+  - `dags/example_mixed_namespace.py`: one DAG running tasks in both namespaces
 
 ## Common Commands
 

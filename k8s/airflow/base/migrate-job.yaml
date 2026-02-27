@@ -12,6 +12,8 @@ spec:
     spec:
       serviceAccountName: airflow-db-migrate
       restartPolicy: OnFailure
+      nodeSelector:
+        airflow-node-pool: core
       initContainers:
         - name: wait-for-mysql
           image: apache/airflow:3.0.0-python3.12

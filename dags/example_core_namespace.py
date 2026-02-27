@@ -4,8 +4,6 @@ Example DAG: Tasks run in airflow-core namespace via executor_config override.
 Uses pod_override in executor_config to explicitly target the airflow-core
 namespace instead of the default airflow-user namespace. This requires
 multi_namespace_mode=True in the KubernetesExecutor config.
-
-Push this file to the remote_airflow repo under dags/ directory.
 """
 
 from datetime import datetime
@@ -13,6 +11,13 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from kubernetes.client import models as k8s
+
+CORE_EXECUTOR_CONFIG = {
+    "pod_template_file": "/home/airflow/pod_templates/pod_template_core.yaml",
+    "pod_override": k8s.V1Pod(
+        metadata=k8s.V1ObjectMeta(namespace="airflow-core"),
+    ),
+}
 
 with DAG(
     dag_id="example_core_namespace",
@@ -42,11 +47,7 @@ with DAG(
             "  echo \"WARN: Expected airflow-core but got $NAMESPACE\"; "
             "fi"
         ),
-        executor_config={
-            "pod_override": k8s.V1Pod(
-                metadata=k8s.V1ObjectMeta(namespace="airflow-core"),
-            ),
-        },
+        executor_config=CORE_EXECUTOR_CONFIG,
     )
 
     run_task = BashOperator(
@@ -56,11 +57,7 @@ with DAG(
             "python3 -c \"import sys; print(f'Python {sys.version}')\" && "
             "echo 'Task completed successfully'"
         ),
-        executor_config={
-            "pod_override": k8s.V1Pod(
-                metadata=k8s.V1ObjectMeta(namespace="airflow-core"),
-            ),
-        },
+        executor_config=CORE_EXECUTOR_CONFIG,
     )
 
     verify_namespace >> run_task

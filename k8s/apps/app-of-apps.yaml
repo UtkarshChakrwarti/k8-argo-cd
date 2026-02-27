@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/UtkarshChakrwarti/k8-argo-cd.git
+    repoURL: https://github.com/UtkarshChakrwarti/Codespace_PLAY.git
     path: k8s/apps
     targetRevision: feature/multi-namespace-executor
   destination:

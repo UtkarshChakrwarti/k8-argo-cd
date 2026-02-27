@@ -3,8 +3,6 @@ Example DAG: Tasks run in airflow-user namespace (default).
 
 No executor_config override needed — KubernetesExecutor uses the default
 namespace (airflow-user) configured via AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE.
-
-Push this file to the remote_airflow repo under dags/ directory.
 """
 
 from datetime import datetime

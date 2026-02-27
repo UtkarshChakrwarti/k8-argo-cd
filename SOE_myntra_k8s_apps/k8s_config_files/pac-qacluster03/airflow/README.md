@@ -35,3 +35,4 @@ You can use [90-argocd-application-template.yaml](90-argocd-application-template
   - `--max-failures=-1` keeps retrying forever.
   - `--stale-worktree-timeout=5m` cleans stale temporary worktrees.
 - Worker pods are retained (`DELETE_WORKER_PODS=False`) to keep Airflow task log links stable.
+- Task log handler uses Kubernetes pod-log fallback, so Airflow UI can read logs across both namespaces.

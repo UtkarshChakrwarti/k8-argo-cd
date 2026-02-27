@@ -34,6 +34,7 @@ check_required_files() {
         "dags/example_user_namespace.py"
         "dags/example_core_namespace.py"
         "dags/example_mixed_namespace.py"
+        "dags/airflow_logging_config.py"
     )
 
     local missing=()

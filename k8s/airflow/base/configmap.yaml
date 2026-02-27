@@ -27,6 +27,7 @@ data:
   AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver.airflow-core.svc.cluster.local:8080/execution/"
   # Logging
   AIRFLOW__CORE__BASE_LOG_FOLDER: /home/airflow/logs
+  AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS: airflow_logging_config.LOGGING_CONFIG
   # Database (3.0: AIRFLOW__DATABASE__ replaces deprecated AIRFLOW__CORE__)
   AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS: "False"
   AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_PRE_PING: "True"

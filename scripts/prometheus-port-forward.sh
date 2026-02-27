@@ -27,4 +27,4 @@ log_success "Setting up port-forward to Prometheus on port $PORT..."
 log_info "Access Prometheus at: http://localhost:$PORT"
 log_info "Press Ctrl+C to stop port-forward"
 
-kubectl port-forward -n "$NAMESPACE" "svc/$SERVICE_NAME" "$PORT:9090"
+kubectl port-forward -n "$NAMESPACE" "svc/$SERVICE_NAME" "$PORT:9090" --address 0.0.0.0

@@ -28,4 +28,4 @@ log_success "Setting up port-forward to Argo CD server on port $ARGOCD_PORT..."
 log_info "Access Argo CD at: https://localhost:$ARGOCD_PORT"
 log_info "Press Ctrl+C to stop port-forward"
 
-kubectl port-forward -n "$ARGOCD_NAMESPACE" svc/argocd-server "$ARGOCD_PORT:443"
+kubectl port-forward -n "$ARGOCD_NAMESPACE" svc/argocd-server "$ARGOCD_PORT:443" --address 0.0.0.0

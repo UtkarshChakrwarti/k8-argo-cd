@@ -25,3 +25,8 @@ You can use [90-argocd-application-template.yaml](90-argocd-application-template
 - Control-plane namespace: `airflow-core`
 - Task namespace: `airflow-user`
 - Monitoring/observability is not in a separate namespace; it runs in `airflow-core`
+- DAG sync resilience:
+  - Continuous sync uses `--link=repo` with atomic switch to new revision.
+  - If pull/fetch fails, old DAG files stay in place (last-good revision is preserved).
+  - `--max-failures=-1` keeps retrying forever.
+  - `--stale-worktree-timeout=5m` cleans stale temporary worktrees.

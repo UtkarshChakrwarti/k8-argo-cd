@@ -28,4 +28,4 @@ log_success "Setting up port-forward to monitoring UI on port $MONITORING_PORT..
 log_info "Access monitoring UI at: http://localhost:$MONITORING_PORT"
 log_info "Press Ctrl+C to stop port-forward"
 
-kubectl port-forward -n "$MONITORING_NAMESPACE" "svc/$MONITORING_SERVICE" "$MONITORING_PORT:80"
+kubectl port-forward -n "$MONITORING_NAMESPACE" "svc/$MONITORING_SERVICE" "$MONITORING_PORT:80" --address 0.0.0.0

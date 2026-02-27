@@ -74,6 +74,8 @@ data:
             - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
             - --ref=main
             - --one-time
+            - --max-failures=-1
+            - --sync-timeout=2m
             - --link=repo
             - --root=/git
           volumeMounts:
@@ -141,6 +143,8 @@ data:
             - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
             - --ref=main
             - --one-time
+            - --max-failures=-1
+            - --sync-timeout=2m
             - --link=repo
             - --root=/git
           volumeMounts:

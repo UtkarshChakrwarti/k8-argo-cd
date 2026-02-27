@@ -28,4 +28,4 @@ log_info "Access Grafana at: http://localhost:$PORT"
 log_info "Default credentials: admin/admin"
 log_info "Press Ctrl+C to stop port-forward"
 
-kubectl port-forward -n "$NAMESPACE" "svc/$SERVICE_NAME" "$PORT:3000"
+kubectl port-forward -n "$NAMESPACE" "svc/$SERVICE_NAME" "$PORT:3000" --address 0.0.0.0

@@ -28,6 +28,11 @@ spec:
             - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
             - --ref=main
             - --period=30s
+            # Keep serving last-good DAG revision if a sync fails.
+            - --max-failures=-1
+            # Garbage-collect old worktrees after link moves to a new revision.
+            - --stale-worktree-timeout=5m
+            - --sync-timeout=2m
             - --link=repo
             - --root=/git
           volumeMounts:

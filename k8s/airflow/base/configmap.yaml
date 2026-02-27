@@ -79,20 +79,9 @@ data:
       initContainers:
         - name: git-sync-init
           image: registry.k8s.io/git-sync/git-sync:v4.2.3
-          env:
-            - name: GITSYNC_REPO
-              valueFrom:
-                configMapKeyRef:
-                  name: airflow-config
-                  key: DAG_GIT_SYNC_REPO
-            - name: GITSYNC_REF
-              valueFrom:
-                configMapKeyRef:
-                  name: airflow-config
-                  key: DAG_GIT_SYNC_REF
           args:
-            - --repo=$(GITSYNC_REPO)
-            - --ref=$(GITSYNC_REF)
+            - --repo=https://github.com/UtkarshChakrwarti/k8-argo-cd.git
+            - --ref=feature/multi-namespace-executor
             - --one-time
             - --max-failures=-1
             - --sync-timeout=2m
@@ -113,9 +102,6 @@ data:
                 secretKeyRef:
                   name: airflow-secret
                   key: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-          envFrom:
-            - configMapRef:
-                name: airflow-config
           volumeMounts:
             - name: dags
               mountPath: /home/airflow/dags
@@ -161,20 +147,9 @@ data:
       initContainers:
         - name: git-sync-init
           image: registry.k8s.io/git-sync/git-sync:v4.2.3
-          env:
-            - name: GITSYNC_REPO
-              valueFrom:
-                configMapKeyRef:
-                  name: airflow-config
-                  key: DAG_GIT_SYNC_REPO
-            - name: GITSYNC_REF
-              valueFrom:
-                configMapKeyRef:
-                  name: airflow-config
-                  key: DAG_GIT_SYNC_REF
           args:
-            - --repo=$(GITSYNC_REPO)
-            - --ref=$(GITSYNC_REF)
+            - --repo=https://github.com/UtkarshChakrwarti/k8-argo-cd.git
+            - --ref=feature/multi-namespace-executor
             - --one-time
             - --max-failures=-1
             - --sync-timeout=2m
@@ -195,9 +170,6 @@ data:
                 secretKeyRef:
                   name: airflow-secret
                   key: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-          envFrom:
-            - configMapRef:
-                name: airflow-config
           volumeMounts:
             - name: dags
               mountPath: /home/airflow/dags

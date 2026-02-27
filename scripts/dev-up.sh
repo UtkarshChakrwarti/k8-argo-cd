@@ -25,8 +25,8 @@ GIT_BIN="/opt/homebrew/bin/git"
 if ! command -v "$GIT_BIN" &>/dev/null; then
     GIT_BIN="git"
 fi
-# Keep GitOps revision explicit to avoid coupling Argo sync to local repo branch name.
-GIT_REVISION="${GIT_REVISION:-feature/multi-namespace-executor}"
+# Default to main so local bootstrap tracks the production branch unless overridden.
+GIT_REVISION="${GIT_REVISION:-main}"
 ARGO_APP_WAIT_TIMEOUT_SEC="${ARGO_APP_WAIT_TIMEOUT_SEC:-900}"
 MYSQL_READY_TIMEOUT_SEC="${MYSQL_READY_TIMEOUT_SEC:-600}"
 AIRFLOW_READY_TIMEOUT_SEC="${AIRFLOW_READY_TIMEOUT_SEC:-900}"

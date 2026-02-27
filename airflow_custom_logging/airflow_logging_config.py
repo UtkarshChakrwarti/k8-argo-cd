@@ -15,16 +15,23 @@ LOGGING_CONFIG = {
             "format": "[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
         },
     },
+    "filters": {
+        "mask_secrets": {
+            "()": "airflow.sdk.execution_time.secrets_masker.SecretsMasker",
+        },
+    },
     "handlers": {
         "console": {
             "class": "airflow.utils.log.logging_mixin.RedirectStdHandler",
             "formatter": "airflow",
             "stream": "sys.stdout",
+            "filters": ["mask_secrets"],
         },
         "task": {
             "class": "airflow_logging_k8s_handler.KubernetesPodFallbackTaskHandler",
             "formatter": "airflow",
             "base_log_folder": "/home/airflow/logs",
+            "filters": ["mask_secrets"],
         },
     },
     "loggers": {
@@ -32,6 +39,7 @@ LOGGING_CONFIG = {
             "handlers": ["task"],
             "level": "INFO",
             "propagate": True,
+            "filters": ["mask_secrets"],
         },
         "flask_appbuilder": {
             "handlers": ["console"],
@@ -42,6 +50,7 @@ LOGGING_CONFIG = {
     "root": {
         "handlers": ["console"],
         "level": "INFO",
+        "filters": ["mask_secrets"],
     },
 }
 

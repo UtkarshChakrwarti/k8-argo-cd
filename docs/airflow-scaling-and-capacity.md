@@ -86,3 +86,5 @@ Recommended trigger points:
 - Airflow UI: `http://localhost:8090`
 - Argo CD: `https://localhost:8080`
 - Monitoring UI (pods/workloads): `http://localhost:8091`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin/admin)

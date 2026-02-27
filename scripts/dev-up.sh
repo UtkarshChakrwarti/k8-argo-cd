@@ -19,6 +19,8 @@ KIND_CONFIG="/tmp/kind-config.yaml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_URL="https://github.com/UtkarshChakrwarti/k8-argo-cd.git"
 MONITORING_PORT="${MONITORING_PORT:-8091}"
+PROMETHEUS_PORT="${PROMETHEUS_PORT:-9090}"
+GRAFANA_PORT="${GRAFANA_PORT:-3000}"
 GIT_BIN="/opt/homebrew/bin/git"
 if ! command -v "$GIT_BIN" &>/dev/null; then
     GIT_BIN="git"
@@ -297,25 +299,42 @@ patch_child_apps() {
 
 # ─── Wait for monitoring UI ───────────────────────────────────────────────────
 wait_for_monitoring() {
-    log_info "Waiting for monitoring deployment..."
+    log_info "Waiting for monitoring deployments..."
+    local deployments=(
+        "kube-ops-view"
+        "kube-state-metrics"
+        "prometheus"
+        "grafana"
+    )
     local deadline=$((SECONDS + 120))
     while true; do
-        if kubectl get deployment kube-ops-view -n "$MONITORING_NAMESPACE" &>/dev/null; then
+        local all_exist=true
+        for dep in "${deployments[@]}"; do
+            if ! kubectl get deployment "$dep" -n "$MONITORING_NAMESPACE" &>/dev/null; then
+                all_exist=false
+                break
+            fi
+        done
+        if $all_exist; then
             break
         fi
         if [ $SECONDS -ge $deadline ]; then
-            log_warning "Timeout waiting for monitoring deployment creation"
+            log_warning "Timeout waiting for monitoring deployments creation"
             log_warning "Check ArgoCD sync status: argocd app get monitoring-app"
             return 1
         fi
         sleep 5
     done
 
-    if kubectl wait --for=condition=available --timeout=180s \
-        deployment/kube-ops-view -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
-        log_success "Monitoring UI deployment is ready"
+    if kubectl wait --for=condition=available --timeout=240s \
+        deployment/kube-ops-view \
+        deployment/kube-state-metrics \
+        deployment/prometheus \
+        deployment/grafana \
+        -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+        log_success "Monitoring stack is ready"
     else
-        log_warning "Monitoring deployment is not ready yet"
+        log_warning "Monitoring stack is not fully ready yet"
     fi
 }
 
@@ -424,6 +443,26 @@ setup_monitoring_portforward() {
     log_success "Monitoring UI available at http://localhost:${MONITORING_PORT}"
 }
 
+# ─── Port-forward Prometheus ─────────────────────────────────────────────────
+setup_prometheus_portforward() {
+    pkill -f "kubectl port-forward.*prometheus.*${PROMETHEUS_PORT}" 2>/dev/null || true
+    sleep 1
+    log_info "Starting Prometheus port-forward on localhost:${PROMETHEUS_PORT}..."
+    kubectl port-forward -n "$MONITORING_NAMESPACE" svc/prometheus "${PROMETHEUS_PORT}:9090" \
+        --address 0.0.0.0 >/dev/null 2>&1 &
+    log_success "Prometheus available at http://localhost:${PROMETHEUS_PORT}"
+}
+
+# ─── Port-forward Grafana ────────────────────────────────────────────────────
+setup_grafana_portforward() {
+    pkill -f "kubectl port-forward.*grafana.*${GRAFANA_PORT}" 2>/dev/null || true
+    sleep 1
+    log_info "Starting Grafana port-forward on localhost:${GRAFANA_PORT}..."
+    kubectl port-forward -n "$MONITORING_NAMESPACE" svc/grafana "${GRAFANA_PORT}:3000" \
+        --address 0.0.0.0 >/dev/null 2>&1 &
+    log_success "Grafana available at http://localhost:${GRAFANA_PORT} (admin/admin)"
+}
+
 # ─── Summary ──────────────────────────────────────────────────────────────────
 print_summary() {
     echo ""
@@ -435,6 +474,8 @@ print_summary() {
     echo "  Airflow UI   →  http://localhost:8090   (see .airflow-credentials.txt)"
     echo "  MySQL DB     →  127.0.0.1:3306          (see .mysql-credentials.txt)"
     echo "  Monitoring   →  http://localhost:${MONITORING_PORT}"
+    echo "  Prometheus   →  http://localhost:${PROMETHEUS_PORT}"
+    echo "  Grafana      →  http://localhost:${GRAFANA_PORT} (admin/admin)"
     echo "  Git repo     →  ${REPO_URL}"
     echo ""
     echo "  Namespaces:"
@@ -467,6 +508,8 @@ main() {
     setup_airflow_portforward || true
     setup_mysql_portforward   || true
     setup_monitoring_portforward || true
+    setup_prometheus_portforward || true
+    setup_grafana_portforward || true
     print_summary
 }
 

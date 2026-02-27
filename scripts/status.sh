@@ -116,10 +116,15 @@ main() {
     echo ""
 
     # Monitoring status
-    log_section "Monitoring UI (namespace: $MONITORING_NAMESPACE)"
+    log_section "Monitoring Stack (namespace: $MONITORING_NAMESPACE)"
     check_status "Kube Ops View" "$MONITORING_NAMESPACE" "deployment" "kube-ops-view"
+    check_status "Kube State Metrics" "$MONITORING_NAMESPACE" "deployment" "kube-state-metrics"
+    check_status "Prometheus" "$MONITORING_NAMESPACE" "deployment" "prometheus"
+    check_status "Grafana" "$MONITORING_NAMESPACE" "deployment" "grafana"
     log_info "Monitoring Pods:"
     kubectl get pods -n "$MONITORING_NAMESPACE" -o wide 2>/dev/null || echo "Monitoring deployment not ready yet"
+    log_info "Monitoring Services:"
+    kubectl get svc -n "$MONITORING_NAMESPACE" kube-ops-view kube-state-metrics prometheus grafana 2>/dev/null || true
     echo ""
 
     # Node status

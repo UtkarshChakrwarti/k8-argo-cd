@@ -12,3 +12,9 @@ labels:
 replicas:
   - name: kube-ops-view
     count: 1
+  - name: kube-state-metrics
+    count: 1
+  - name: prometheus
+    count: 1
+  - name: grafana
+    count: 1

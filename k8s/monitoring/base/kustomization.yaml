@@ -5,6 +5,9 @@ resources:
   - rbac.yaml
   - deployment.yaml
   - service.yaml
+  - kube-state-metrics.yaml
+  - prometheus.yaml
+  - grafana.yaml
 
 labels:
   - pairs:

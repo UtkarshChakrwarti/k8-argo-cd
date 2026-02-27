@@ -16,3 +16,6 @@ resources:
   - 12-deploy-dag-processor.yaml
   - 13-services.yaml
   - 14-monitoring-kube-ops-view.yaml
+  - 15-kube-state-metrics.yaml
+  - 16-prometheus.yaml
+  - 17-grafana.yaml

@@ -28,6 +28,8 @@ check_required_files() {
         "scripts/dev-down.sh"
         "scripts/status.sh"
         "scripts/monitoring-port-forward.sh"
+        "scripts/prometheus-port-forward.sh"
+        "scripts/grafana-port-forward.sh"
         "docs/airflow-scaling-and-capacity.md"
     )
 

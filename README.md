@@ -9,7 +9,11 @@ A Kubernetes-native Airflow 3.0.0 stack managed with Argo CD (App-of-Apps) on a 
 - Airflow control plane namespace: `airflow-core`
 - Airflow task namespace: `airflow-user` (default for `KubernetesExecutor`)
 - Database: MySQL (`mysql` namespace)
-- Monitoring UI: kube-ops-view (`airflow-core` namespace)
+- Observability stack in `airflow-core`:
+  - kube-ops-view
+  - kube-state-metrics
+  - Prometheus
+  - Grafana
 
 ## Quick Start
 
@@ -24,6 +28,8 @@ This creates the cluster, installs Argo CD, bootstraps applications, and starts 
 - Argo CD: `https://localhost:8080` (admin/admin)
 - Airflow: `http://localhost:8090` (admin/admin)
 - Monitoring (pods/nodes/workloads): `http://localhost:8091`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin/admin)
 - MySQL: `127.0.0.1:3306`
 
 Credentials are written to:
@@ -47,6 +53,8 @@ Credentials are written to:
 - `make argocd-port-forward` - start Argo CD port-forward
 - `make airflow-port-forward` - start Airflow port-forward
 - `make monitoring-port-forward` - start monitoring UI port-forward
+- `make prometheus-port-forward` - start Prometheus port-forward
+- `make grafana-port-forward` - start Grafana port-forward
 - `make dev-down` - tear down everything
 
 ## Scaling Reference

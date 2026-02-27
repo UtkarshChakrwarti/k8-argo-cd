@@ -25,7 +25,8 @@ GIT_BIN="/opt/homebrew/bin/git"
 if ! command -v "$GIT_BIN" &>/dev/null; then
     GIT_BIN="git"
 fi
-GIT_REVISION="${GIT_REVISION:-$("$GIT_BIN" -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo feature/multi-namespace-executor)}"
+# Keep GitOps revision explicit to avoid coupling Argo sync to local repo branch name.
+GIT_REVISION="${GIT_REVISION:-feature/multi-namespace-executor}"
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }

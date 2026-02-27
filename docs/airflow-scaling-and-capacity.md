@@ -17,10 +17,10 @@ Current replicas (dev overlay):
 - `airflow-dag-sync`: 1
 
 Current CPU/Memory:
-- `airflow-scheduler`: request `500m/1Gi`, limit `2000m/2Gi`
-- `airflow-webserver`: request `500m/1Gi`, limit `1000m/2Gi`
-- `airflow-triggerer`: request `500m/1Gi`, limit `1000m/2Gi`
-- `airflow-dag-processor`: request `250m/512Mi`, limit `1000m/1Gi`
+- `airflow-scheduler`: request `300m/768Mi`, limit `1200m/1536Mi`
+- `airflow-webserver`: request `250m/512Mi`, limit `1000m/1Gi`
+- `airflow-triggerer`: request `250m/512Mi`, limit `1000m/1Gi`
+- `airflow-dag-processor`: request `200m/384Mi`, limit `800m/768Mi`
 - `airflow-dag-sync`: request `50m/32Mi`, limit `200m/128Mi`
 - `airflow-db-migrate` job: request `250m/512Mi`, limit `1000m/1Gi`
 

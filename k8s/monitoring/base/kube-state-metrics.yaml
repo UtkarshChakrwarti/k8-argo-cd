@@ -47,6 +47,7 @@ metadata:
   namespace: airflow-core
 spec:
   replicas: 1
+  revisionHistoryLimit: 1
   selector:
     matchLabels:
       app: kube-state-metrics

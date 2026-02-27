@@ -30,6 +30,7 @@ You can use [90-argocd-application-template.yaml](90-argocd-application-template
 - DAG authoring helper for namespace routing is available in runtime image path:
   - `from airflow_namespace_executor import namespace_executor_config`
   - Set DAG-level `default_args["executor_config"] = namespace_executor_config("airflow-user" | "airflow-core")`
+- Namespace-only routing is enforced by pod mutation hook (`AIRFLOW__KUBERNETES_EXECUTOR__POD_MUTATION_HOOK`), so node pool placement follows namespace automatically.
 - New DAGs are auto-unpaused (`AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False`) so scheduled DAGs start without manual unpause.
 - DAG sync resilience:
   - Continuous sync uses `--link=repo` with atomic switch to new revision.

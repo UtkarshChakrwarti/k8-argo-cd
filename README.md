@@ -68,6 +68,7 @@ default_args = {
 ```
 
 Set `executor_config` once in `default_args` so the full DAG runs in that namespace.
+Namespace alone is enough: a pod mutation hook maps `airflow-core` to the core node pool and `airflow-user` to the user node pool automatically.
 
 ## Repo Roles
 

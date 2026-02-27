@@ -31,7 +31,8 @@ This creates the cluster, installs Argo CD, bootstraps applications, and starts 
 - Airflow: `http://localhost:8090` (admin/admin)
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (admin/admin)
-  - Default dashboard: `Airflow Kubernetes Overview`
+  - Default dashboard: `Airflow Platform Command Center`
+  - Stable URL: `http://localhost:3000/d/airflow-platform-command-center/airflow-platform-command-center`
 - MySQL: `127.0.0.1:3306`
 
 Credentials are written to:

@@ -97,7 +97,8 @@ Recommended trigger points:
 - Argo CD: `https://localhost:8080`
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (admin/admin)
-- Grafana default dashboard: `Airflow Kubernetes Overview`
+- Grafana default dashboard: `Airflow Platform Command Center`
+- Stable URL: `http://localhost:3000/d/airflow-platform-command-center/airflow-platform-command-center`
 
 ## 8. DAG Sync Source and Failure Behavior
 

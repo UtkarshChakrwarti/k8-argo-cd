@@ -57,10 +57,12 @@ metadata:
 data:
   airflow-k8s-overview.json: |
     {
+      "uid": "airflow-platform-command-center",
       "title": "Airflow Platform Command Center",
+      "datasource": "Prometheus",
       "tags": ["airflow", "kubernetes", "business", "engineering"],
       "schemaVersion": 39,
-      "version": 4,
+      "version": 5,
       "refresh": "15s",
       "time": {"from": "now-12h", "to": "now"},
       "panels": [

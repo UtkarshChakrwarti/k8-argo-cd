@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  name: kube-ops-view
+  namespace: airflow-core
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  name: kube-ops-view-read-only
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "nodes", "namespaces", "events", "services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "statefulsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  name: kube-ops-view-read-only
+subjects:
+  - kind: ServiceAccount
+    name: kube-ops-view
+    namespace: airflow-core
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-ops-view-read-only
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  name: kube-ops-view
+  namespace: airflow-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kube-ops-view
+  template:
+    metadata:
+      labels:
+        app: kube-ops-view
+    spec:
+      serviceAccountName: kube-ops-view
+      containers:
+        - name: kube-ops-view
+          image: hjacobs/kube-ops-view:20.4.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  name: kube-ops-view
+  namespace: airflow-core
+spec:
+  type: ClusterIP
+  selector:
+    app: kube-ops-view
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

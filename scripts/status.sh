@@ -16,7 +16,7 @@ ARGOCD_NAMESPACE="argocd"
 MYSQL_NAMESPACE="mysql"
 AIRFLOW_CORE_NAMESPACE="airflow-core"
 AIRFLOW_USER_NAMESPACE="airflow-user"
-MONITORING_NAMESPACE="monitoring"
+MONITORING_NAMESPACE="airflow-core"
 
 # Helper functions
 log_info() {
@@ -119,7 +119,7 @@ main() {
     log_section "Monitoring UI (namespace: $MONITORING_NAMESPACE)"
     check_status "Kube Ops View" "$MONITORING_NAMESPACE" "deployment" "kube-ops-view"
     log_info "Monitoring Pods:"
-    kubectl get pods -n "$MONITORING_NAMESPACE" -o wide 2>/dev/null || echo "Monitoring namespace not ready yet"
+    kubectl get pods -n "$MONITORING_NAMESPACE" -o wide 2>/dev/null || echo "Monitoring deployment not ready yet"
     echo ""
 
     # Node status

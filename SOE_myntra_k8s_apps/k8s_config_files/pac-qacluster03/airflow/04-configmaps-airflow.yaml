@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  name: airflow-config
+  namespace: airflow-core
+data:
+  AIRFLOW_HOME: /home/airflow
+  # Executor — multi-namespace KubernetesExecutor
+  AIRFLOW__CORE__EXECUTOR: KubernetesExecutor
+  AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE: airflow-user
+  AIRFLOW__KUBERNETES_EXECUTOR__MULTI_NAMESPACE_MODE: "True"
+  AIRFLOW__KUBERNETES_EXECUTOR__MULTI_NAMESPACE_MODE_NAMESPACE_LIST: "airflow-core,airflow-user"
+  AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE: /home/airflow/pod_templates/pod_template_user.yaml
+  AIRFLOW__KUBERNETES_EXECUTOR__IN_CLUSTER: "True"
+  AIRFLOW__KUBERNETES_EXECUTOR__DELETE_WORKER_PODS: "True"
+  AIRFLOW__KUBERNETES_EXECUTOR__WORKER_PODS_CREATION_BATCH_SIZE: "1"
+  # DAGs
+  AIRFLOW__CORE__DAGS_FOLDER: /home/airflow/dags/repo/dags
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  # Execution API (Airflow 3)
+  AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver.airflow-core.svc.cluster.local:8080/execution/"
+  # Logging
+  AIRFLOW__CORE__BASE_LOG_FOLDER: /home/airflow/logs
+  # Database (3.0: AIRFLOW__DATABASE__ replaces deprecated AIRFLOW__CORE__)
+  AIRFLOW__DATABASE__LOAD_DEFAULT_CONNECTIONS: "False"
+  AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_PRE_PING: "True"
+  AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_RECYCLE: "1800"
+  AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE: "20"
+  AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW: "10"
+  AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_TIMEOUT: "90"
+  # Webserver / API server
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
+  AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+  # Scheduler - delegate DAG parsing to the standalone dag-processor pod
+  AIRFLOW__SCHEDULER__STANDALONE_DAG_PROCESSOR: "True"
+  AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "True"
+  AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "30"
+  # Core tuning
+  AIRFLOW__CORE__PARALLELISM: "200"
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  name: airflow-pod-template
+  namespace: airflow-core
+data:
+  # Default pod template — tasks run in airflow-user namespace
+  pod_template_user.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: airflow-task-pod
+      labels:
+        app: airflow-task
+        managed-by: airflow
+        pool: airflow-user
+        workload-type: on-demand
+    spec:
+      serviceAccountName: airflow-task-sa
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 50000
+        runAsGroup: 50000
+        fsGroup: 50000
+      initContainers:
+        - name: git-sync-init
+          image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          args:
+            - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
+            - --ref=main
+            - --one-time
+            - --link=repo
+            - --root=/git
+          volumeMounts:
+            - name: dags
+              mountPath: /git
+      containers:
+        - name: base
+          image: apache/airflow:3.0.0-python3.12
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: AIRFLOW__CORE__DAGS_FOLDER
+              value: /home/airflow/dags/repo/dags
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+          volumeMounts:
+            - name: dags
+              mountPath: /home/airflow/dags
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 50000
+      volumes:
+        - name: dags
+          emptyDir: {}
+        - name: airflow-logs
+          emptyDir: {}
+  # Pod template for tasks running in airflow-core namespace
+  pod_template_core.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: airflow-task-pod
+      labels:
+        app: airflow-task
+        managed-by: airflow
+        pool: airflow-core
+        workload-type: scheduled
+    spec:
+      serviceAccountName: airflow-task-sa
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 50000
+        runAsGroup: 50000
+        fsGroup: 50000
+      initContainers:
+        - name: git-sync-init
+          image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          args:
+            - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
+            - --ref=main
+            - --one-time
+            - --link=repo
+            - --root=/git
+          volumeMounts:
+            - name: dags
+              mountPath: /git
+      containers:
+        - name: base
+          image: apache/airflow:3.0.0-python3.12
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: AIRFLOW__CORE__DAGS_FOLDER
+              value: /home/airflow/dags/repo/dags
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+          volumeMounts:
+            - name: dags
+              mountPath: /home/airflow/dags
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 50000
+      volumes:
+        - name: dags
+          emptyDir: {}
+        - name: airflow-logs
+          emptyDir: {}

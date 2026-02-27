@@ -15,7 +15,7 @@ log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
-MONITORING_NAMESPACE="monitoring"
+MONITORING_NAMESPACE="airflow-core"
 MONITORING_SERVICE="kube-ops-view"
 MONITORING_PORT="${MONITORING_PORT:-8091}"
 

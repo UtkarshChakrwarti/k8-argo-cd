@@ -106,7 +106,7 @@ logs:
 	@kubectl get pods -n airflow-user --show-labels 2>/dev/null || echo "No task pods"
 	@echo ""
 	@echo "$(BLUE)=== Monitoring Logs ===$(NC)"
-	@kubectl logs -n monitoring deployment/kube-ops-view --tail=50 || true
+	@kubectl logs -n airflow-core deployment/kube-ops-view --tail=50 || true
 
 # Validate manifests
 validate:
@@ -114,6 +114,7 @@ validate:
 	@kubectl kustomize k8s/mysql/overlays/dev > /dev/null && echo "$(GREEN)✓ MySQL manifests valid$(NC)" || (echo "$(YELLOW)✗ MySQL manifests invalid$(NC)" && false)
 	@kubectl kustomize k8s/airflow/overlays/dev > /dev/null && echo "$(GREEN)✓ Airflow manifests valid$(NC)" || (echo "$(YELLOW)✗ Airflow manifests invalid$(NC)" && false)
 	@kubectl kustomize k8s/monitoring/overlays/dev > /dev/null && echo "$(GREEN)✓ Monitoring manifests valid$(NC)" || (echo "$(YELLOW)✗ Monitoring manifests invalid$(NC)" && false)
+	@kubectl kustomize SOE_myntra_k8s_apps/k8s_config_files/pac-qacluster03/airflow > /dev/null && echo "$(GREEN)✓ SOE handoff manifests valid$(NC)" || (echo "$(YELLOW)✗ SOE handoff manifests invalid$(NC)" && false)
 	@kubectl kustomize k8s/apps > /dev/null && echo "$(GREEN)✓ Apps manifests valid$(NC)" || (echo "$(YELLOW)✗ Apps manifests invalid$(NC)" && false)
 
 # Sanity checks

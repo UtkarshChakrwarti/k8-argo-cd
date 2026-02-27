@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  name: airflow-dag-processor
+  namespace: airflow-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-dag-processor
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "3"
+      labels:
+        app: airflow-dag-processor
+    spec:
+      serviceAccountName: airflow-scheduler
+      containers:
+        - name: dag-processor
+          image: apache/airflow:3.0.0-python3.12
+          command: ["airflow", "dag-processor"]
+          envFrom:
+            - configMapRef:
+                name: airflow-config
+            - secretRef:
+                name: airflow-secret
+          volumeMounts:
+            - name: airflow-logs
+              mountPath: /home/airflow/logs
+            - name: dags
+              mountPath: /home/airflow/dags
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 50000
+
+      volumes:
+        - name: airflow-logs
+          persistentVolumeClaim:
+            claimName: logs-local-pvc
+        - name: dags
+          persistentVolumeClaim:
+            claimName: dags-pvc

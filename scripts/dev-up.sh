@@ -14,7 +14,7 @@ ARGOCD_NAMESPACE="argocd"
 MYSQL_NAMESPACE="mysql"
 AIRFLOW_CORE_NAMESPACE="airflow-core"
 AIRFLOW_USER_NAMESPACE="airflow-user"
-MONITORING_NAMESPACE="monitoring"
+MONITORING_NAMESPACE="airflow-core"
 KIND_CONFIG="/tmp/kind-config.yaml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_URL="https://github.com/UtkarshChakrwarti/k8-argo-cd.git"
@@ -149,10 +149,10 @@ install_argocd() {
 # ─── Namespaces ───────────────────────────────────────────────────────────────
 create_namespaces() {
     log_info "Creating namespaces..."
-    for ns in "$MYSQL_NAMESPACE" "$AIRFLOW_CORE_NAMESPACE" "$AIRFLOW_USER_NAMESPACE" "$MONITORING_NAMESPACE"; do
+    for ns in "$MYSQL_NAMESPACE" "$AIRFLOW_CORE_NAMESPACE" "$AIRFLOW_USER_NAMESPACE"; do
         kubectl get namespace "$ns" &>/dev/null || kubectl create namespace "$ns"
     done
-    log_success "Namespaces ready: $MYSQL_NAMESPACE, $AIRFLOW_CORE_NAMESPACE, $AIRFLOW_USER_NAMESPACE, $MONITORING_NAMESPACE"
+    log_success "Namespaces ready: $MYSQL_NAMESPACE, $AIRFLOW_CORE_NAMESPACE, $AIRFLOW_USER_NAMESPACE"
 }
 
 # ─── MySQL secret ─────────────────────────────────────────────────────────────
@@ -440,7 +440,7 @@ print_summary() {
     echo "  Namespaces:"
     echo "    airflow-core  →  scheduler, webserver, triggerer, dag-processor, git-sync"
     echo "    airflow-user  →  task pods (default KubernetesExecutor target)"
-    echo "    monitoring    →  kube-ops-view (cluster pods UI)"
+    echo "    kube-ops-view →  deployed in airflow-core"
     echo ""
     echo "  make status      – component health"
     echo "  make logs        – tail logs"

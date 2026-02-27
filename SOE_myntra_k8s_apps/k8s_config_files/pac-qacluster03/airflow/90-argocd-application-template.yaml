@@ -1,19 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: monitoring-app
+  name: airflow-pac-qacluster03
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
     repoURL: https://github.com/UtkarshChakrwarti/k8-argo-cd.git
-    path: k8s/monitoring/overlays/dev
+    path: SOE_myntra_k8s_apps/k8s_config_files/pac-qacluster03/airflow
     targetRevision: feature/multi-namespace-executor
   destination:
     server: https://kubernetes.default.svc
-    namespace: airflow-core
   syncPolicy:
     automated:
       prune: true

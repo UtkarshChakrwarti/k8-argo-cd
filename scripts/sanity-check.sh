@@ -23,6 +23,7 @@ check_required_files() {
         "k8s/apps/airflow-app.yaml"
         "k8s/apps/monitoring-app.yaml"
         "k8s/monitoring/overlays/dev/kustomization.yaml"
+        "SOE_myntra_k8s_apps/k8s_config_files/pac-qacluster03/airflow/kustomization.yaml"
         "scripts/dev-up.sh"
         "scripts/dev-down.sh"
         "scripts/status.sh"

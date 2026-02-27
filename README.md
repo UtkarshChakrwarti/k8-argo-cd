@@ -9,7 +9,7 @@ A Kubernetes-native Airflow 3.0.0 stack managed with Argo CD (App-of-Apps) on a 
 - Airflow control plane namespace: `airflow-core`
 - Airflow task namespace: `airflow-user` (default for `KubernetesExecutor`)
 - Database: MySQL (`mysql` namespace)
-- Monitoring UI: kube-ops-view (`monitoring` namespace)
+- Monitoring UI: kube-ops-view (`airflow-core` namespace)
 
 ## Quick Start
 

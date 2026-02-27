@@ -1,0 +1,46 @@
+# dag-sync-deployment.yaml
+# Standalone git-sync that continuously pulls DAGs into the shared PVC.
+# This is the ONLY writer — all Airflow pods read from the same PVC.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  name: airflow-dag-sync
+  namespace: airflow-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-dag-sync
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/sync-wave: "3"
+      labels:
+        app: airflow-dag-sync
+    spec:
+      containers:
+        - name: git-sync
+          image: registry.k8s.io/git-sync/git-sync:v4.2.3
+          args:
+            - --repo=https://github.com/UtkarshChakrwarti/remote_airflow.git
+            - --ref=main
+            - --period=30s
+            - --link=repo
+            - --root=/git
+          volumeMounts:
+            - name: dags
+              mountPath: /git
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+      volumes:
+        - name: dags
+          persistentVolumeClaim:
+            claimName: dags-pvc

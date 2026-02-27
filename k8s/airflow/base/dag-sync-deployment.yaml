@@ -27,19 +27,19 @@ spec:
         - name: git-sync
           image: registry.k8s.io/git-sync/git-sync:v4.2.3
           env:
-            - name: GIT_SYNC_REPO
+            - name: GITSYNC_REPO
               valueFrom:
                 configMapKeyRef:
                   name: airflow-config
                   key: DAG_GIT_SYNC_REPO
-            - name: GIT_SYNC_REF
+            - name: GITSYNC_REF
               valueFrom:
                 configMapKeyRef:
                   name: airflow-config
                   key: DAG_GIT_SYNC_REF
           args:
-            - --repo=$(GIT_SYNC_REPO)
-            - --ref=$(GIT_SYNC_REF)
+            - --repo=$(GITSYNC_REPO)
+            - --ref=$(GITSYNC_REF)
             - --period=30s
             # Keep serving last-good DAG revision if a sync fails.
             - --max-failures=-1

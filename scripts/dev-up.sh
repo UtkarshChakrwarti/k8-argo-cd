@@ -110,7 +110,11 @@ EOF
 configure_node_pools() {
     log_info "Configuring node pools for Airflow (core/user)..."
 
-    mapfile -t workers < <(kubectl get nodes -o name | sed 's|node/||' | rg 'worker' | sort)
+    workers=()
+    while IFS= read -r node; do
+        workers+=("$node")
+    done < <(kubectl get nodes -o name | sed 's|node/||' | rg 'worker' | sort)
+
     if [ "${#workers[@]}" -eq 0 ]; then
         log_error "No worker nodes found to label/taint"
         return 1

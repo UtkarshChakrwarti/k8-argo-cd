@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/UtkarshChakrwarti/Codespace_PLAY.git
+    repoURL: https://github.com/UtkarshChakrwarti/k8-argo-cd.git
     path: k8s/mysql/overlays/dev
     targetRevision: feature/multi-namespace-executor
   destination:

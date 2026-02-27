@@ -19,7 +19,7 @@ data:
   # DAGs
   AIRFLOW__CORE__DAGS_FOLDER: /home/airflow/dags/repo/dags
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-  DAG_GIT_SYNC_REPO: https://github.com/UtkarshChakrwarti/Codespace_PLAY.git
+  DAG_GIT_SYNC_REPO: https://github.com/UtkarshChakrwarti/k8-argo-cd.git
   DAG_GIT_SYNC_REF: feature/multi-namespace-executor
   # Execution API (Airflow 3)
   AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver.airflow-core.svc.cluster.local:8080/execution/"

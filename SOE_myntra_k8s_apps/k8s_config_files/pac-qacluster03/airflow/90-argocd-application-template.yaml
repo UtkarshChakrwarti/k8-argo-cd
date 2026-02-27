@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/UtkarshChakrwarti/Codespace_PLAY.git
+    repoURL: https://github.com/UtkarshChakrwarti/k8-argo-cd.git
     path: SOE_myntra_k8s_apps/k8s_config_files/pac-qacluster03/airflow
     targetRevision: feature/multi-namespace-executor
   destination:

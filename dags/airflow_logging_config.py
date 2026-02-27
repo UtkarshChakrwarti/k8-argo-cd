@@ -99,3 +99,6 @@ class KubernetesPodFallbackTaskHandler(FileTaskHandler):
 
 LOGGING_CONFIG = deepcopy(DEFAULT_LOGGING_CONFIG)
 LOGGING_CONFIG["handlers"]["task"]["class"] = "airflow_logging_config.KubernetesPodFallbackTaskHandler"
+
+# Airflow 3 imports this symbol from custom logging modules.
+REMOTE_TASK_LOG = None

@@ -129,7 +129,7 @@ start_port_forward() {
     : >"$log_file"
     if command -v screen >/dev/null 2>&1; then
         screen -S "$session_name" -X quit >/dev/null 2>&1 || true
-        screen -dmS "$session_name" bash -lc "$pf_cmd >> \"$log_file\" 2>&1"
+        screen -dmS "$session_name" bash -lc "while true; do $pf_cmd >> \"$log_file\" 2>&1; echo \"[WARN] port-forward ${name} exited, retrying in 2s\" >> \"$log_file\"; sleep 2; done"
         echo "$session_name" > "$session_file"
     else
         nohup bash -lc "$pf_cmd" >"$log_file" 2>&1 </dev/null &
